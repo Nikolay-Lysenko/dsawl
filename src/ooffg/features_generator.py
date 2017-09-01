@@ -31,17 +31,20 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
 
     Also this class allows avoiding overfitting by generating
     new features based only on out-of-fold values of target.
+
+    :param aggregators: functions that compute aggregates
     """
 
-    def __init__(self):
+    def __init__(self, aggregators: List[Callable] = None):
+        self.aggregators = [np.mean] if aggregators is None else aggregators
+        # TODO: Implement `min_support` argument and/or smoothing.
         self.mappings_ = dict()
 
     def fit(
             self,
             X: np.ndarray,
             y: np.ndarray,
-            source_positions: List[int],
-            aggregators: List[Callable] = None
+            source_positions: List[int]
             ) -> 'FeaturesGenerator':
         """
         Fit to a whole dataset of `X` and `y`.
@@ -50,15 +53,12 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
         :param y: target
         :param source_positions: indices of initial features to be
                                  used as conditions
-        :param aggregators: functions that compute aggregates
         :return: fitted instance
         """
-        # TODO: Implement `min_support` argument and/or smoothing.
-        aggregators = [np.mean] if aggregators is None else aggregators
         for position in source_positions:
             feature = X[:, position]
             self.mappings_[position] = {
-                k: [agg(y[feature == k]) for agg in aggregators]
+                k: [agg(y[feature == k]) for agg in self.aggregators]
                 for k in np.unique(feature)
             }
         return self
@@ -102,7 +102,6 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
             n_splits: int,
             shuffle: bool = False,
             random_state: int = None,
-            aggregators: List[Callable] = None,
             drop_source_features: bool = True
             ) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -119,7 +118,6 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
         :param n_splits: number of folds for feature generation
         :param shuffle: whether to shuffle objects before splitting
         :param random_state: pseudo-random numbers generator seed
-        :param aggregators: functions that compute aggregates
         :param drop_source_features: drop or keep those of initial
                                      features that are used for
                                      conditioning over them
@@ -127,7 +125,7 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
                  target left unchanged
         """
         new_n_columns = (X.shape[1] +
-                         len(aggregators) * len(source_positions) -
+                         len(self.aggregators) * len(source_positions) -
                          drop_source_features * len(source_positions))
         transformed_X = np.full((X.shape[0], new_n_columns), np.nan)
         kf = KFold(n_splits, random_state, shuffle)
@@ -135,8 +133,7 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
             self.fit(
                 X[fit_indices],
                 y[fit_indices],
-                source_positions,
-                aggregators
+                source_positions
             )
             transformed_X[transform_indices, :] = self.transform(
                 X[transform_indices],

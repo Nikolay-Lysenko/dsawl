@@ -55,7 +55,7 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
             save_training_features_as_attr: bool = False
             ) -> 'OutOfFoldFeaturesEstimator':
         self.drop_source_features_ = drop_source_features
-        self.features_generator_ = FeaturesGenerator()
+        self.features_generator_ = FeaturesGenerator(self.aggregators)
         extended_X = self.features_generator_.fit_transform_out_of_fold(
             X,
             y,
@@ -63,10 +63,9 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
             self.n_splits,
             self.shuffle,
             self.random_state,
-            self.aggregators,
             drop_source_features
         )
-        self.features_generator_.fit(X, y, source_positions, self.aggregators)
+        self.features_generator_.fit(X, y, source_positions)
 
         if estimator_kwargs is None:
             estimator_kwargs = dict()
