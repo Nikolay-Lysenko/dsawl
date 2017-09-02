@@ -20,7 +20,7 @@ pip install .
 
 Instructions for other operating systems will be released in the future.
 
-After successful installation, you can use this package like any other regular package from your currently activated virtual environment:
+After successful installation, you can use this package like any other regular package from your currently activated virtual environment. For example, you can import a class from it:
 ```
 from dsawl.ooffg.estimators import OutOfFoldFeaturesRegressor
 ```
