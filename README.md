@@ -13,7 +13,7 @@ If you are using Linux, execute this from your terminal:
 cd path/to/your/destination
 git clone https://github.com/Nikolay-Lysenko/dsawl
 cd dsawl
-source activate your_conda\_env
+source activate your\_conda\_env
 conda install --file package-list.txt
 pip install .
 ```
