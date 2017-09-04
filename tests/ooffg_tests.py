@@ -117,9 +117,14 @@ class TestFeaturesGenerator(unittest.TestCase):
 
 
 def main():
-    for tester in [TestFeaturesGenerator()]:
-        suite = unittest.TestLoader().loadTestsFromModule(tester)
-        unittest.TextTestRunner().run(suite)
+    test_loader = unittest.TestLoader()
+    suites_list = []
+    test_classes = [TestFeaturesGenerator()]
+    for test_class in test_classes:
+        suite = test_loader.loadTestsFromModule(test_class)
+        suites_list.append(suite)
+    overall_suite = unittest.TestSuite(suites_list)
+    unittest.TextTestRunner().run(overall_suite)
 
 
 if __name__ == '__main__':
