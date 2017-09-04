@@ -18,7 +18,7 @@ conda install --file package-list.txt
 pip install .
 ```
 
-Instructions for other operating systems will be released in the future.
+Instructions for other operating systems will be released in the future (probably, above commands are valid not only on Linux).
 
 After successful installation, you can use this package like any other regular package from your currently activated virtual environment. For example, you can import a class from it:
 ```
