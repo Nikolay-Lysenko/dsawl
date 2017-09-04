@@ -48,7 +48,7 @@ class TestFeaturesGenerator(unittest.TestCase):
     Tests of `FeatureGenerator` class.
     """
 
-    def test_infold_fit_transform(self) -> type(None):
+    def test_fit_transform_in_fold(self) -> type(None):
         """
         Test combination of `fit` and `transform`.
 
@@ -80,6 +80,40 @@ class TestFeaturesGenerator(unittest.TestCase):
             dtype=float
         )
         self.assertTrue(np.array_equal(execution_result, true_answer))
+
+    def test_fit_transform_out_of_fold(self) -> type(None):
+        """
+        Test `fit_transform_out_of_fold` method.
+
+        :return: None
+        """
+        X, y = get_regression_dataset()
+        fg = FeaturesGenerator(aggregators=[np.mean, np.median])
+        execution_result = fg.fit_transform_out_of_fold(
+            X,
+            y,
+            source_positions=[1],
+            n_splits=5
+        )
+        true_answer = np.array(
+            [[1, 7, 7],
+             [2, 7, 7],
+             [3, 7, 7],
+             [4, 2, 2],
+             [10, 2, 2],
+             [1, 6.75, 5.5],
+             [2, 7.5, 7.5],
+             [3, 7.5, 7.5],
+             [4, 7.5, 7.5],
+             [10, 4.5, 4.5],
+             [1, 29 / 3, 8],
+             [2, 29 / 3, 8],
+             [3, 5.5, 5.5],
+             [4, 5.5, 5.5],
+             [10, 5.5, 5.5]],
+            dtype=float
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
 
 
 def main():
