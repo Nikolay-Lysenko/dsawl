@@ -121,14 +121,13 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
         :param drop_source_features: drop or keep those of initial
                                      features that are used for
                                      conditioning over them
-        :return: transformed feature representation and
-                 target left unchanged
+        :return: transformed feature representation
         """
         new_n_columns = (X.shape[1] +
                          len(self.aggregators) * len(source_positions) -
                          drop_source_features * len(source_positions))
         transformed_X = np.full((X.shape[0], new_n_columns), np.nan)
-        kf = KFold(n_splits, random_state, shuffle)
+        kf = KFold(n_splits, shuffle, random_state)
         for fit_indices, transform_indices in kf.split(X):
             self.fit(
                 X[fit_indices],
@@ -140,4 +139,4 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
                 drop_source_features
             )
         self.mappings_ = dict()  # A sort of cleaning up.
-        return transformed_X, y
+        return transformed_X
