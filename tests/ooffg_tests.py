@@ -48,9 +48,9 @@ class TestFeaturesGenerator(unittest.TestCase):
     Tests of `FeatureGenerator` class.
     """
 
-    def test_fit_transform_in_fold(self) -> type(None):
+    def test_fit_transform(self) -> type(None):
         """
-        Test combination of `fit` and `transform`.
+        Test in-fold combination of `fit` and `transform`.
 
         :return: None
         """
