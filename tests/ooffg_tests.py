@@ -1,5 +1,5 @@
 """
-This module contains tests of code from `src/ooffg` directory.
+This module contains tests of code from `dsawl/ooffg` directory.
 It is code that provides out-of-fold feature generation functionality.
 
 @author: Nikolay Lysenko
@@ -11,10 +11,12 @@ from typing import Tuple
 
 import numpy as np
 
-from dsawl.ooffg.features_generator import FeaturesGenerator
+from dsawl.ooffg.target_based_features_creator import (
+    TargetBasedFeaturesCreator
+)
 
 
-def get_regression_dataset() -> Tuple[np.ndarray, np.ndarray]:
+def get_dataset_for_features_creation() -> Tuple[np.ndarray, np.ndarray]:
     """
     Get dataset with one numerical feature, one label-encoded
     categorical feature, and a numerical target variable.
@@ -43,9 +45,9 @@ def get_regression_dataset() -> Tuple[np.ndarray, np.ndarray]:
     return X, y
 
 
-class TestFeaturesGenerator(unittest.TestCase):
+class TestTargetBasedFeaturesCreator(unittest.TestCase):
     """
-    Tests of `FeatureGenerator` class.
+    Tests of `TargetBasedFeaturesCreator` class.
     """
 
     def test_fit_transform(self) -> type(None):
@@ -54,8 +56,8 @@ class TestFeaturesGenerator(unittest.TestCase):
 
         :return: None
         """
-        X, y = get_regression_dataset()
-        fg = FeaturesGenerator(aggregators=[np.mean, np.median])
+        X, y = get_dataset_for_features_creation()
+        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
         execution_result = fg.fit_transform(
             X,
             y,
@@ -87,8 +89,8 @@ class TestFeaturesGenerator(unittest.TestCase):
 
         :return: None
         """
-        X, y = get_regression_dataset()
-        fg = FeaturesGenerator(aggregators=[np.mean, np.median])
+        X, y = get_dataset_for_features_creation()
+        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
         execution_result = fg.fit_transform_out_of_fold(
             X,
             y,
@@ -119,9 +121,9 @@ class TestFeaturesGenerator(unittest.TestCase):
 def main():
     test_loader = unittest.TestLoader()
     suites_list = []
-    test_classes = [TestFeaturesGenerator()]
-    for test_class in test_classes:
-        suite = test_loader.loadTestsFromModule(test_class)
+    testers = [TestTargetBasedFeaturesCreator()]
+    for tester in testers:
+        suite = test_loader.loadTestsFromModule(tester)
         suites_list.append(suite)
     overall_suite = unittest.TestSuite(suites_list)
     unittest.TextTestRunner().run(overall_suite)

@@ -3,7 +3,8 @@ This module is for both in-fold and out-of-fold generation of
 features that are derived in the following manner:
 1) group target variable by a particular initial feature;
 2) apply aggregating function to each group;
-3) use corresponding aggregated value as a new feature of object.
+3) for each object, use corresponding aggregated value
+   as a new feature.
 
 @author: Nikolay Lysenko
 """
@@ -17,7 +18,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import KFold
 
 
-class FeaturesGenerator(BaseEstimator, TransformerMixin):
+class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
     """
     This class can augment datasets with new features such that
     each of them is conditional value of an aggregating function
@@ -45,9 +46,11 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
             X: np.ndarray,
             y: np.ndarray,
             source_positions: List[int]
-            ) -> 'FeaturesGenerator':
+            ) -> 'TargetBasedFeaturesCreator':
         """
         Fit to a whole dataset of `X` and `y`.
+        In other words, memorize mappings from initial values
+        of selected columns to conditional aggregates.
 
         :param X: features
         :param y: target
@@ -108,8 +111,8 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
         Enrich `X` with features based on `y` in a manner that
         reduces risk of overfitting.
         This property holds true, because for each object its own
-        value of target variable is not used for its new features
-        generation.
+        value of target variable is not used for generation of
+        its new features.
 
         :param X: feature representation to be augmented
         :param y: target to be incorporated in new features
@@ -118,6 +121,7 @@ class FeaturesGenerator(BaseEstimator, TransformerMixin):
         :param n_splits: number of folds for feature generation
         :param shuffle: whether to shuffle objects before splitting
         :param random_state: pseudo-random numbers generator seed
+                             for shuffling
         :param drop_source_features: drop or keep those of initial
                                      features that are used for
                                      conditioning over them

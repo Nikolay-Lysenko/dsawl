@@ -1,7 +1,7 @@
 """
 The module provides estimators that have compatible with `sklearn` API.
-These estimators are learnt with involvement of out-of-fold generated
-features (which can replace some of initial features).
+These estimators are learnt with involvement of target-based
+out-of-fold generated features (which can replace some of initial features).
 
 @author: Nikolay Lysenko
 """
@@ -13,7 +13,7 @@ from typing import List, Dict, Callable, Any
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 
-from .features_generator import FeaturesGenerator
+from .target_based_features_creator import TargetBasedFeaturesCreator
 
 
 class OutOfFoldFeaturesEstimator(BaseEstimator):
@@ -24,7 +24,7 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
     :param estimator: internal estimator to be fitted
     :param n_splits: number of folds for feature generation
     :param shuffle: whether to shuffle objects before splitting
-    :param random_state: pseudo-random numbers generator seed
+    :param random_state: pseudo-random numbers generator seed for shuffling
     :param aggregators: functions that compute aggregates
     """
 
@@ -41,7 +41,7 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
         self.shuffle = shuffle
         self.random_state = random_state
         self.aggregators = [np.mean] if aggregators is None else aggregators
-        self.features_generator_ = None
+        self.features_creator_ = None
         self.drop_source_features_ = None
         self.extended_X_ = None
 
@@ -55,8 +55,8 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
             save_training_features_as_attr: bool = False
             ) -> 'OutOfFoldFeaturesEstimator':
         self.drop_source_features_ = drop_source_features
-        self.features_generator_ = FeaturesGenerator(self.aggregators)
-        extended_X = self.features_generator_.fit_transform_out_of_fold(
+        self.features_creator_ = TargetBasedFeaturesCreator(self.aggregators)
+        extended_X = self.features_creator_.fit_transform_out_of_fold(
             X,
             y,
             source_positions,
@@ -65,7 +65,7 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
             self.random_state,
             drop_source_features
         )
-        self.features_generator_.fit(X, y, source_positions)
+        self.features_creator_.fit(X, y, source_positions)
 
         if estimator_kwargs is None:
             estimator_kwargs = dict()
@@ -87,7 +87,7 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
         target variable are generated and used as features.
 
         Risk of overfitting is reduced, because for each object
-        its own target is not used in its features generation.
+        its own target is not used for generation of its features.
 
         :param X: features
         :param y: target
@@ -119,7 +119,7 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
         :param X: features of objects
         :return: predictions
         """
-        extended_X = self.features_generator_.transform(
+        extended_X = self.features_creator_.transform(
             X,
             self.drop_source_features_
         )
@@ -147,11 +147,13 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
         :param estimator_kwargs: settings of internal estimator fit
         :return: predictions
         """
-        self.__fit(X, y, source_positions, drop_source_features,
-                   estimator_kwargs, save_training_features_as_attr=True)
-        predictions = self.estimator.predict(self.extended_X_)
-        self.extended_X_ = None  # TODO: Use context manager.
-        return predictions
+        try:
+            self.__fit(X, y, source_positions, drop_source_features,
+                       estimator_kwargs, save_training_features_as_attr=True)
+            predictions = self.estimator.predict(self.extended_X_)
+            return predictions
+        finally:
+            self.extended_X_ = None
 
 
 class OutOfFoldFeaturesRegressor(
@@ -177,12 +179,15 @@ class OutOfFoldFeaturesClassifier(
         """
         Predict class probabilities for objects represented as `X`.
 
+        If you need in probabilities' predictions for learning sample,
+        use `fit_predict_proba` method.
+
         :param X: features of objects
-        :return: predictions
+        :return: predicted probabilities
         """
         if not hasattr(self.estimator, "predict_proba"):
             raise NotImplementedError("Estimator has not predict_proba method")
-        extended_X = self.features_generator_.transform(
+        extended_X = self.features_creator_.transform(
             X,
             self.drop_source_features_
         )
@@ -201,9 +206,6 @@ class OutOfFoldFeaturesClassifier(
         Train model and predict class probabilities for the
         training set.
 
-        If you need in probabilities predictions for learning sample,
-        use `fit_predict` method.
-
         :param X: features
         :param y: target
         :param source_positions: indices of initial features to be
@@ -212,13 +214,15 @@ class OutOfFoldFeaturesClassifier(
                                      features that are used for
                                      conditioning over them
         :param estimator_kwargs: settings of internal estimator fit
-        :return: predictions
+        :return: predicted probabilities
         """
         if not hasattr(self.estimator, "predict_proba"):
             raise NotImplementedError("Estimator has not predict_proba method")
-        self.__fit(X, y, source_positions, drop_source_features,
-                   estimator_kwargs, save_training_features_as_attr=True)
-        predicted_probabilities = \
-            self.estimator.predict_proba(self.extended_X_)
-        self.extended_X_ = None  # TODO: Use context manager.
-        return predicted_probabilities
+        try:
+            self.__fit(X, y, source_positions, drop_source_features,
+                       estimator_kwargs, save_training_features_as_attr=True)
+            predicted_probabilities = \
+                self.estimator.predict_proba(self.extended_X_)
+            return predicted_probabilities
+        finally:
+            self.extended_X_ = None
