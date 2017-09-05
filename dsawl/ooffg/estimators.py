@@ -24,7 +24,8 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
     :param estimator: internal estimator to be fitted
     :param n_splits: number of folds for feature generation
     :param shuffle: whether to shuffle objects before splitting
-    :param random_state: pseudo-random numbers generator seed for shuffling
+    :param random_state: pseudo-random numbers generator seed for
+                         shuffling only, not for training.
     :param aggregators: functions that compute aggregates
     """
 
@@ -45,7 +46,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         self.drop_source_features_ = None
         self.extended_X_ = None
 
-    def __fit(
+    def _fit(
             self,
             X: np.ndarray,
             y: np.ndarray,
@@ -99,8 +100,8 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         :param estimator_kwargs: settings of internal estimator fit
         :return: fitted estimator
         """
-        self.__fit(X, y, source_positions, drop_source_features,
-                   estimator_kwargs, save_training_features_as_attr=False)
+        self._fit(X, y, source_positions, drop_source_features,
+                  estimator_kwargs, save_training_features_as_attr=False)
         return self
 
     def predict(
@@ -150,8 +151,8 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         :return: predictions
         """
         try:
-            self.__fit(X, y, source_positions, drop_source_features,
-                       estimator_kwargs, save_training_features_as_attr=True)
+            self._fit(X, y, source_positions, drop_source_features,
+                      estimator_kwargs, save_training_features_as_attr=True)
             predictions = self.estimator.predict(self.extended_X_)
             return predictions
         finally:
@@ -227,8 +228,8 @@ class OutOfFoldFeaturesClassifier(
                 "Internal estimator has not predict_proba method"
             )
         try:
-            self.__fit(X, y, source_positions, drop_source_features,
-                       estimator_kwargs, save_training_features_as_attr=True)
+            self._fit(X, y, source_positions, drop_source_features,
+                      estimator_kwargs, save_training_features_as_attr=True)
             predicted_probabilities = \
                 self.estimator.predict_proba(self.extended_X_)
             return predicted_probabilities
