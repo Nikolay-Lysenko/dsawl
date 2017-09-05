@@ -16,7 +16,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from .target_based_features_creator import TargetBasedFeaturesCreator
 
 
-class OutOfFoldFeaturesEstimator(BaseEstimator):
+class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
     """
     Parent class for regression and classification estimators.
     It should not be instantiated.
@@ -53,7 +53,7 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
             drop_source_features: bool = True,
             estimator_kwargs: Dict[Any, Any] = None,
             save_training_features_as_attr: bool = False
-            ) -> 'OutOfFoldFeaturesEstimator':
+            ) -> 'BaseOutOfFoldFeaturesEstimator':
         self.drop_source_features_ = drop_source_features
         self.features_creator_ = TargetBasedFeaturesCreator(self.aggregators)
         extended_X = self.features_creator_.fit_transform_out_of_fold(
@@ -81,7 +81,7 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
             source_positions: List[int],
             drop_source_features: bool = True,
             estimator_kwargs: Dict[Any, Any] = None
-            ) -> 'OutOfFoldFeaturesEstimator':
+            ) -> 'BaseOutOfFoldFeaturesEstimator':
         """
         Fit estimator to a dataset where conditional aggregates of
         target variable are generated and used as features.
@@ -119,6 +119,8 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
         :param X: features of objects
         :return: predictions
         """
+        if self.features_creator_ is None:
+            raise RuntimeError("Estimator must be trained before predicting")
         extended_X = self.features_creator_.transform(
             X,
             self.drop_source_features_
@@ -157,7 +159,7 @@ class OutOfFoldFeaturesEstimator(BaseEstimator):
 
 
 class OutOfFoldFeaturesRegressor(
-        OutOfFoldFeaturesEstimator, RegressorMixin):
+        BaseOutOfFoldFeaturesEstimator, RegressorMixin):
     """
     Regressor that has out-of-fold feature generation before
     training.
@@ -166,7 +168,7 @@ class OutOfFoldFeaturesRegressor(
 
 
 class OutOfFoldFeaturesClassifier(
-        OutOfFoldFeaturesEstimator, ClassifierMixin):
+        BaseOutOfFoldFeaturesEstimator, ClassifierMixin):
     """
     Classifier that has out-of-fold feature generation before
     training.
@@ -186,7 +188,11 @@ class OutOfFoldFeaturesClassifier(
         :return: predicted probabilities
         """
         if not hasattr(self.estimator, "predict_proba"):
-            raise NotImplementedError("Estimator has not predict_proba method")
+            raise NotImplementedError(
+                "Internal estimator has not predict_proba method"
+            )
+        if self.features_creator_ is None:
+            raise RuntimeError("Estimator must be trained before predicting")
         extended_X = self.features_creator_.transform(
             X,
             self.drop_source_features_
@@ -217,7 +223,9 @@ class OutOfFoldFeaturesClassifier(
         :return: predicted probabilities
         """
         if not hasattr(self.estimator, "predict_proba"):
-            raise NotImplementedError("Estimator has not predict_proba method")
+            raise NotImplementedError(
+                "Internal estimator has not predict_proba method"
+            )
         try:
             self.__fit(X, y, source_positions, drop_source_features,
                        estimator_kwargs, save_training_features_as_attr=True)
