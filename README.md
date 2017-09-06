@@ -8,6 +8,8 @@ Repository name is a combination of three words: DS, saw, and awl. DS is as an a
 
 
 ## How to install the package?
+The package is compatible with Python 3.5 or newer. Other requirements are installed by `conda` if you follow below instructions.
+
 If you are using Linux, execute this from your terminal:
 ```
 cd path/to/your/destination
