@@ -156,6 +156,7 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
             LinearRegression(),
+            estimator_kwargs=dict(),
             n_splits=3
         )
         ooffr.fit(X, y, source_positions=[1])
@@ -175,6 +176,7 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
             LinearRegression(),
+            estimator_kwargs=dict(),
             n_splits=3
         )
         ooffr.fit(X, y, source_positions=[1])
@@ -191,6 +193,7 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
             LinearRegression(),
+            estimator_kwargs=dict(),
             n_splits=3
         )
         result = ooffr.fit_predict(X, y, source_positions=[1])
@@ -231,7 +234,8 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         """
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
-            LogisticRegression(random_state=361),
+            LogisticRegression(),
+            estimator_kwargs={'random_state': 361},
             n_splits=3
         )
         ooffc.fit(X, y, source_positions=[1])
@@ -250,7 +254,8 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         """
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
-            LogisticRegression(random_state=361),
+            LogisticRegression(),
+            estimator_kwargs={'random_state': 361},
             n_splits=3
         )
         ooffc.fit(X, y, source_positions=[1])
@@ -267,7 +272,8 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         """
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
-            LogisticRegression(random_state=361),
+            LogisticRegression(),
+            estimator_kwargs={'random_state': 361},
             n_splits=3
         )
         result = ooffc.fit_predict_proba(X, y, source_positions=[1])[:, 1]

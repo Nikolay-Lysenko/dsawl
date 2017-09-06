@@ -25,6 +25,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
     It should not be instantiated.
 
     :param estimator: internal estimator to be fitted
+    :param estimator_kwargs: parameters of internal estimator
     :param n_splits: number of folds for feature generation
     :param shuffle: whether to shuffle objects before splitting
     :param random_state: pseudo-random numbers generator seed for
@@ -42,6 +43,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
     def __init__(
             self,
             estimator: BaseEstimator,
+            estimator_kwargs: Dict,
             n_splits: int,
             shuffle: bool = False,
             random_state: int = None,
@@ -50,6 +52,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             min_frequency: int = 1
             ):
         self.estimator = estimator
+        self.estimator.set_params(**estimator_kwargs)
         self.n_splits = n_splits
         self.shuffle = shuffle
         self.random_state = random_state
