@@ -87,6 +87,81 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         )
         self.assertTrue(np.array_equal(execution_result, true_answer))
 
+    def test_fit_transform_with_smoothing(self) -> type(None):
+        """
+        Test in-fold combination of `fit` and `transform`
+        with smoothing.
+
+        :return: None
+        """
+        X, y = get_dataset_for_features_creation()
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median],
+            smoothing_strength=5
+        )
+        execution_result = fg.fit_transform(
+            X,
+            y,
+            source_positions=[1]
+        )
+        true_answer = np.array(
+            [[1, 5, 4],
+             [2, 5, 4],
+             [3, 5, 4],
+             [4, 5, 4],
+             [10, 5, 4],
+             [1, 6, 5],
+             [2, 6, 5],
+             [3, 6, 5],
+             [4, 6, 5],
+             [10, 6, 5],
+             [1, 7, 6],
+             [2, 7, 6],
+             [3, 7, 6],
+             [4, 7, 6],
+             [10, 7, 6]],
+            dtype=float
+        )
+        self.assertTrue(np.array_equal(execution_result, true_answer))
+
+    def test_fit_transform_with_min_frequency(self) -> type(None):
+        """
+        Test in-fold combination of `fit` and `transform`
+        with threshold on number of occurrences.
+
+        :return: None
+        """
+        X, y = get_dataset_for_features_creation()
+        X = X[:-1, :]
+        y = y[:-1]
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median],
+            min_frequency=5
+        )
+        execution_result = fg.fit_transform(
+            X,
+            y,
+            source_positions=[1]
+        )
+        true_answer = np.array(
+            [[1, 4, 3],
+             [2, 4, 3],
+             [3, 4, 3],
+             [4, 4, 3],
+             [10, 4, 3],
+             [1, 6, 5],
+             [2, 6, 5],
+             [3, 6, 5],
+             [4, 6, 5],
+             [10, 6, 5],
+             [1, 76 / 14, 5],
+             [2, 76 / 14, 5],
+             [3, 76 / 14, 5],
+             [4, 76 / 14, 5]],
+            dtype=float
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
     def test_fit_transform_out_of_fold(self) -> type(None):
         """
         Test `fit_transform_out_of_fold` method.
