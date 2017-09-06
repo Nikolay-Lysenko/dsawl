@@ -1,4 +1,4 @@
-* Extend docstrings (if necessary) and create `docs` directory with tutorial in format of Jupyter notebook.
+* Cover case with no current value in other folds in tests.
+* Extend docstrings (if necessary) and write introductory section in `docs/ooffg/demo.ipynb`.
 * Run load testing and optimize bottle-necks.
-* Implement `min_support` argument and/or smoothing in `TargetBasedFeaturesCreator` class.
 * Support rolling (time-preserving) splits.
