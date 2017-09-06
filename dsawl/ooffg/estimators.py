@@ -1,11 +1,14 @@
 """
 The module provides estimators that have compatible with `sklearn` API.
 These estimators are learnt with involvement of target-based
-out-of-fold generated features (which can replace some of initial features).
+out-of-fold generated features (which can replace some of
+initial features).
+Fitting is implemented in a way that leads to more realistic
+cross-validation scores in comparison with plain generation of features
+that are aggregates of target value.
 
 @author: Nikolay Lysenko
 """
-# TODO: Write more about out-of-fold feature generation.
 
 
 from typing import List, Dict, Callable, Any
@@ -25,8 +28,15 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
     :param n_splits: number of folds for feature generation
     :param shuffle: whether to shuffle objects before splitting
     :param random_state: pseudo-random numbers generator seed for
-                         shuffling only, not for training.
+                         shuffling only, not for training
     :param aggregators: functions that compute aggregates
+    :param smoothing_strength: strength of smoothing towards
+                               unconditional aggregates for
+                               target-based features creation
+    :param min_frequency: minimal number of occurrences of a feature's
+                          value (if value occurs less times than this
+                          parameter, this value is mapped to
+                          unconditional aggregate)
     """
 
     def __init__(
@@ -35,13 +45,17 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             n_splits: int,
             shuffle: bool = False,
             random_state: int = None,
-            aggregators: List[Callable] = None
+            aggregators: List[Callable] = None,
+            smoothing_strength: float = 0,
+            min_frequency: int = 1
             ):
         self.estimator = estimator
         self.n_splits = n_splits
         self.shuffle = shuffle
         self.random_state = random_state
         self.aggregators = [np.mean] if aggregators is None else aggregators
+        self.smoothing_strength = smoothing_strength
+        self.min_frequency = min_frequency
         self.features_creator_ = None
         self.drop_source_features_ = None
         self.extended_X_ = None
@@ -52,11 +66,15 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             y: np.ndarray,
             source_positions: List[int],
             drop_source_features: bool = True,
-            estimator_kwargs: Dict[Any, Any] = None,
+            fit_kwargs: Dict[Any, Any] = None,
             save_training_features_as_attr: bool = False
             ) -> 'BaseOutOfFoldFeaturesEstimator':
         self.drop_source_features_ = drop_source_features
-        self.features_creator_ = TargetBasedFeaturesCreator(self.aggregators)
+        self.features_creator_ = TargetBasedFeaturesCreator(
+            self.aggregators,
+            self.smoothing_strength,
+            self.min_frequency
+        )
         extended_X = self.features_creator_.fit_transform_out_of_fold(
             X,
             y,
@@ -66,11 +84,10 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             self.random_state,
             drop_source_features
         )
-        self.features_creator_.fit(X, y, source_positions)
 
-        if estimator_kwargs is None:
-            estimator_kwargs = dict()
-        self.estimator.fit(extended_X, y, **estimator_kwargs)
+        if fit_kwargs is None:
+            fit_kwargs = dict()
+        self.estimator.fit(extended_X, y, **fit_kwargs)
         if save_training_features_as_attr:
             self.extended_X_ = extended_X
         return self
@@ -81,7 +98,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             y: np.ndarray,
             source_positions: List[int],
             drop_source_features: bool = True,
-            estimator_kwargs: Dict[Any, Any] = None
+            fit_kwargs: Dict[Any, Any] = None
             ) -> 'BaseOutOfFoldFeaturesEstimator':
         """
         Fit estimator to a dataset where conditional aggregates of
@@ -97,11 +114,11 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         :param drop_source_features: drop or keep those of initial
                                      features that are used for
                                      conditioning over them
-        :param estimator_kwargs: settings of internal estimator fit
+        :param fit_kwargs: settings of internal estimator fit
         :return: fitted estimator
         """
         self._fit(X, y, source_positions, drop_source_features,
-                  estimator_kwargs, save_training_features_as_attr=False)
+                  fit_kwargs, save_training_features_as_attr=False)
         return self
 
     def predict(
@@ -135,7 +152,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             y: np.ndarray,
             source_positions: List[int],
             drop_source_features: bool = True,
-            estimator_kwargs: Dict[Any, Any] = None
+            fit_kwargs: Dict[Any, Any] = None
             ) -> np.ndarray:
         """
         Train model and make predictions for the training set.
@@ -147,12 +164,12 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         :param drop_source_features: drop or keep those of initial
                                      features that are used for
                                      conditioning over them
-        :param estimator_kwargs: settings of internal estimator fit
+        :param fit_kwargs: settings of internal estimator fit
         :return: predictions
         """
         try:
             self._fit(X, y, source_positions, drop_source_features,
-                      estimator_kwargs, save_training_features_as_attr=True)
+                      fit_kwargs, save_training_features_as_attr=True)
             predictions = self.estimator.predict(self.extended_X_)
             return predictions
         finally:
@@ -207,7 +224,7 @@ class OutOfFoldFeaturesClassifier(
             y: np.ndarray,
             source_positions: List[int],
             drop_source_features: bool = True,
-            estimator_kwargs: Dict[Any, Any] = None
+            fit_kwargs: Dict[Any, Any] = None
             ) -> np.ndarray:
         """
         Train model and predict class probabilities for the
@@ -220,7 +237,7 @@ class OutOfFoldFeaturesClassifier(
         :param drop_source_features: drop or keep those of initial
                                      features that are used for
                                      conditioning over them
-        :param estimator_kwargs: settings of internal estimator fit
+        :param fit_kwargs: settings of internal estimator fit
         :return: predicted probabilities
         """
         if not hasattr(self.estimator, "predict_proba"):
@@ -229,7 +246,7 @@ class OutOfFoldFeaturesClassifier(
             )
         try:
             self._fit(X, y, source_positions, drop_source_features,
-                      estimator_kwargs, save_training_features_as_attr=True)
+                      fit_kwargs, save_training_features_as_attr=True)
             predicted_probabilities = \
                 self.estimator.predict_proba(self.extended_X_)
             return predicted_probabilities

@@ -10,7 +10,7 @@ features that are derived in the following manner:
 """
 
 
-from typing import List, Tuple, Callable
+from typing import List, Callable
 
 import numpy as np
 
@@ -30,16 +30,49 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
     within-group mean of target variable where grouping is by
     this categorical feature.
 
+    In order to handle rare values of initial source features,
+    smoothing towards unconditional (i.e., population, general)
+    aggregates can be applied.
+
     Also this class allows avoiding overfitting by generating
     new features based only on out-of-fold values of target.
 
     :param aggregators: functions that compute aggregates
+    :param smoothing_strength: strength of smoothing towards
+                               unconditional aggregates
+    :param min_frequency: minimal number of occurrences of a feature's
+                          value (if value occurs less times than this
+                          parameter, this value is mapped to
+                          unconditional aggregate)
     """
 
-    def __init__(self, aggregators: List[Callable] = None):
+    def __init__(
+            self,
+            aggregators: List[Callable] = None,
+            smoothing_strength: float = 0,
+            min_frequency: int = 1
+            ):
         self.aggregators = [np.mean] if aggregators is None else aggregators
-        # TODO: Implement `min_support` argument and/or smoothing.
+        self.smoothing_strength = smoothing_strength
+        self.min_frequency = min_frequency
         self.mappings_ = dict()
+
+    def __compute_aggregate(
+            self,
+            mask: np.array,
+            target: np.array,
+            aggregator: Callable
+            ) -> float:
+        n_occurrences = sum(mask)
+        if n_occurrences < self.min_frequency:
+            return aggregator(target)
+        else:
+            numerator = (
+                n_occurrences * aggregator(target[mask]) +
+                self.smoothing_strength * aggregator(target)
+            )
+            denominator = n_occurrences + self.smoothing_strength
+            return numerator / denominator
 
     def fit(
             self,
@@ -61,7 +94,8 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         for position in source_positions:
             feature = X[:, position]
             self.mappings_[position] = {
-                k: [agg(y[feature == k]) for agg in self.aggregators]
+                k: [self.__compute_aggregate(feature == k, y, agg)
+                    for agg in self.aggregators]
                 for k in np.unique(feature)
             }
         return self
@@ -106,7 +140,7 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             shuffle: bool = False,
             random_state: int = None,
             drop_source_features: bool = True
-            ) -> Tuple[np.ndarray, np.ndarray]:
+            ) -> np.ndarray:
         """
         Enrich `X` with features based on `y` in a manner that
         reduces risk of overfitting.
@@ -142,5 +176,5 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
                 X[transform_indices],
                 drop_source_features
             )
-        self.mappings_ = dict()  # A sort of cleaning up.
+        self.fit(X, y, source_positions)
         return transformed_X
