@@ -87,6 +87,39 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         )
         self.assertTrue(np.array_equal(execution_result, true_answer))
 
+    def test_fit_transform_with_more_source_positions(self) -> type(None):
+        """
+        Test in-fold combination of `fit` and `transform`.
+
+        :return: None
+        """
+        X, y = get_dataset_for_features_creation()
+        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
+        execution_result = fg.fit_transform(
+            X,
+            y,
+            source_positions=[0, 1]
+        )
+        true_answer = np.array(
+            [[3, 3, 4, 3],
+             [4, 4, 4, 3],
+             [5, 5, 4, 3],
+             [6, 6, 4, 3],
+             [12, 12, 4, 3],
+             [3, 3, 6, 5],
+             [4, 4, 6, 5],
+             [5, 5, 6, 5],
+             [6, 6, 6, 5],
+             [12, 12, 6, 5],
+             [3, 3, 8, 7],
+             [4, 4, 8, 7],
+             [5, 5, 8, 7],
+             [6, 6, 8, 7],
+             [12, 12, 8, 7]],
+            dtype=float
+        )
+        self.assertTrue(np.array_equal(execution_result, true_answer))
+
     def test_fit_transform_with_smoothing(self) -> type(None):
         """
         Test in-fold combination of `fit` and `transform`
@@ -192,6 +225,40 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
              [3, 5.5, 5.5],
              [4, 5.5, 5.5],
              [10, 5.5, 5.5]],
+            dtype=float
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+    def test_fit_transform_out_of_fold_with_more_sources(self) -> type(None):
+        """
+        Test `fit_transform_out_of_fold` method.
+
+        :return: None
+        """
+        X, y = get_dataset_for_features_creation()
+        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
+        execution_result = fg.fit_transform_out_of_fold(
+            X,
+            y,
+            source_positions=[0, 1],
+            n_splits=5
+        )
+        true_answer = np.array(
+            [[4, 4, 7, 7],
+             [5, 5, 7, 7],
+             [6, 6, 7, 7],
+             [7, 7, 2, 2],
+             [13, 13, 2, 2],
+             [3, 3, 6.75, 5.5],
+             [4, 4, 7.5, 7.5],
+             [5, 5, 7.5, 7.5],
+             [6, 6, 7.5, 7.5],
+             [12, 12, 4.5, 4.5],
+             [2, 2, 29 / 3, 8],
+             [3, 3, 29 / 3, 8],
+             [4, 4, 5.5, 5.5],
+             [5, 5, 5.5, 5.5],
+             [11, 11, 5.5, 5.5]],
             dtype=float
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
