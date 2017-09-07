@@ -98,6 +98,10 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
                     for agg in self.aggregators]
                 for k in np.unique(feature)
             }
+            # `None` is a reserved key for unseen values.
+            self.mappings_[position][None] = [
+                agg(feature) for agg in self.aggregators
+            ]
         return self
 
     def transform(
@@ -120,8 +124,11 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             n_new = len(next(iter(mappings.values())))
             new_features = np.full((X.shape[0], n_new), np.nan)
             for value, conditional_aggregates in mappings.items():
+                if value is None:
+                    continue
                 new_features[[feature == value]] = \
                     np.tile(conditional_aggregates, (sum(feature == value), 1))
+            new_features[np.isnan(new_features[:, 0]), :] = mappings[None]
             transformed_X = np.hstack((transformed_X, new_features))
         if drop_source_features:
             relevant_columns = list(filter(
