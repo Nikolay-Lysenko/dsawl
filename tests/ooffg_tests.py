@@ -196,6 +196,39 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
 
+    def test_correct_work_with_rare_values(self) -> type(None):
+        """
+        Test that `fit_transform_out_of_fold` does not produces
+        `np.nan` or other missing placeholders if a value does not
+        occur in folds other than a current one. It must fill it with
+        unconditional aggregate instead of missing placeholder.
+
+        :return: None
+        """
+        X = np.array(
+            [[1, 1],
+             [2, 2],
+             [3, 3]],
+            dtype=float
+        )
+        y = np.array([1, 2, 3], dtype=float)
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median]
+        )
+        execution_result = fg.fit_transform_out_of_fold(
+            X,
+            y,
+            source_positions=[1],
+            n_splits=3
+        )
+        true_answer = np.array(
+            [[1, 2.5, 2.5],
+             [2, 2, 2],
+             [3, 1.5, 1.5]],
+            dtype=float
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
 
 def get_dataset_for_regression() -> Tuple[np.ndarray, np.ndarray]:
     """
