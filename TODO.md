@@ -1,3 +1,3 @@
-* Extend docstrings (if necessary) and write introductory section in `docs/ooffg/demo.ipynb`.
+* Introduce Travis-CI.
 * Run load testing and optimize bottle-necks.
 * Support rolling (time-preserving) splits.
