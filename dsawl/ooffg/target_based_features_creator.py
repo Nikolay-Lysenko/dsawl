@@ -100,7 +100,7 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             }
             # `None` is a reserved key for unseen values.
             self.mappings_[position][None] = [
-                agg(feature) for agg in self.aggregators
+                agg(y) for agg in self.aggregators
             ]
         return self
 
