@@ -1,6 +1,7 @@
 """
 This module contains tests of code from `dsawl/ooffg` directory.
-It is code that provides out-of-fold feature generation functionality.
+Code that is tested here provides out-of-fold feature generation
+functionality ('ooffg' is an abbreviation for this procedure).
 
 @author: Nikolay Lysenko
 """
@@ -22,8 +23,9 @@ from dsawl.ooffg.estimators import (
 
 def get_dataset_for_features_creation() -> Tuple[np.ndarray, np.ndarray]:
     """
-    Get dataset with one numerical feature, one label-encoded
-    categorical feature, and a numerical target variable.
+    Get dataset with numerical target variable and two features
+    such that they can be interpreted both as numerical or as
+    categorical.
 
     :return: X and y
     """
@@ -56,7 +58,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
 
     def test_fit_transform(self) -> type(None):
         """
-        Test in-fold combination of `fit` and `transform`.
+        Test in-fold combination of `fit` and `transform` on data
+        with one numerical feature and one categorical feature.
 
         :return: None
         """
@@ -89,7 +92,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
 
     def test_fit_transform_with_more_source_positions(self) -> type(None):
         """
-        Test in-fold combination of `fit` and `transform`.
+        Test in-fold combination of `fit` and `transform` on data
+        with two categorical features.
 
         :return: None
         """
@@ -197,7 +201,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
 
     def test_fit_transform_out_of_fold(self) -> type(None):
         """
-        Test `fit_transform_out_of_fold` method.
+        Test `fit_transform_out_of_fold` method on data
+        with one numerical feature and one categorical feature.
 
         :return: None
         """
@@ -231,7 +236,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
 
     def test_fit_transform_out_of_fold_with_more_sources(self) -> type(None):
         """
-        Test `fit_transform_out_of_fold` method.
+        Test `fit_transform_out_of_fold` method on data
+        with two categorical features.
 
         :return: None
         """
@@ -273,12 +279,12 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         :return: None
         """
         X = np.array(
-            [[1, 1],
-             [2, 2],
-             [3, 3]],
+            [[4, 1],
+             [5, 2],
+             [6, 3]],
             dtype=float
         )
-        y = np.array([1, 2, 3], dtype=float)
+        y = np.array([2, 4, 6], dtype=float)
         fg = TargetBasedFeaturesCreator(
             aggregators=[np.mean, np.median]
         )
@@ -289,9 +295,9 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             n_splits=3
         )
         true_answer = np.array(
-            [[1, 2.5, 2.5],
-             [2, 2, 2],
-             [3, 1.5, 1.5]],
+            [[4, 5, 5],
+             [5, 4, 4],
+             [6, 3, 3]],
             dtype=float
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
@@ -339,12 +345,10 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         true_answer = np.array([1.8, 0.8])
         self.assertTrue(np.allclose(learnt_slopes, true_answer))
 
-    def test_fit_and_predict(self) -> type(None):
+    def test_predict(self) -> type(None):
         """
-        Test `predict` method as well as `fit` method.
-        Predominantly, it is `test` of `predict` method, but
-        correct work of `fit` method is required.
-        Also note that `fit_predict` must produce different result.
+        Test `predict` method.
+        Note that `fit_predict` must produce different result.
 
         :return: None
         """
@@ -354,7 +358,16 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
             estimator_kwargs=dict(),
             n_splits=3
         )
-        ooffr.fit(X, y, source_positions=[1])
+
+        # Fit it manually.
+        ooffr.estimator.coef_ = np.array([1.8, 0.8])
+        ooffr.estimator.intercept_ = -2.8
+        ooffr.features_creator_ = TargetBasedFeaturesCreator()
+        ooffr.drop_source_features_ = True
+        ooffr.features_creator_.mappings_ = {
+            1: {0.0: [4.0], 1.0: [2.0], None: [3.0]}
+        }
+
         result = ooffr.predict(X)
         true_answer = np.array([5.8, 2.2, 4, 0.6, 2.4, 4.2])
         self.assertTrue(np.allclose(result, true_answer))
@@ -415,15 +428,13 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         )
         ooffc.fit(X, y, source_positions=[1])
         learnt_slopes = ooffc.estimator.coef_
-        true_answer = np.array([0.48251806, -0.16291334])
+        true_answer = np.array([[0.48251806, -0.16291334]])
         self.assertTrue(np.allclose(learnt_slopes, true_answer))
 
-    def test_fit_and_predict_proba(self) -> type(None):
+    def test_predict_proba(self) -> type(None):
         """
-        Test `predict_proba` method as well as `fit` method.
-        Predominantly, it is `test` of `predict` method, but
-        correct work of `fit` method is required.
-        Also note that `fit_predict` must produce different result.
+        Test `predict_proba` method.
+        Note that `fit_predict_proba` must produce different result.
 
         :return: None
         """
@@ -433,7 +444,16 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
             estimator_kwargs={'random_state': 361},
             n_splits=3
         )
-        ooffc.fit(X, y, source_positions=[1])
+
+        # Fit it manually.
+        ooffc.estimator.coef_ = np.array([[0.48251806, -0.16291334]])
+        ooffc.estimator.intercept_ = [-0.51943239]
+        ooffc.features_creator_ = TargetBasedFeaturesCreator()
+        ooffc.drop_source_features_ = True
+        ooffc.features_creator_.mappings_ = {
+            1: {0.0: [2 / 3], 1.0: [1 / 3], None: [0.5]}
+        }
+
         result = ooffc.predict_proba(X)[:, 1]
         true_answer = np.array([0.69413293, 0.46368326, 0.58346035,
                                 0.47721111, 0.59659543, 0.70553938])
