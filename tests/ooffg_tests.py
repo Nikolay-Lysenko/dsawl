@@ -271,7 +271,7 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
 
     def test_correct_work_with_rare_values(self) -> type(None):
         """
-        Test that `fit_transform_out_of_fold` does not produces
+        Test that `fit_transform_out_of_fold` does not produce
         `np.nan` or other missing placeholders if a value does not
         occur in folds other than a current one. It must fill it with
         unconditional aggregate instead of missing placeholder.
@@ -363,10 +363,10 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         ooffr.estimator.coef_ = np.array([1.8, 0.8])
         ooffr.estimator.intercept_ = -2.8
         ooffr.features_creator_ = TargetBasedFeaturesCreator()
-        ooffr.drop_source_features_ = True
         ooffr.features_creator_.mappings_ = {
             1: {0.0: [4.0], 1.0: [2.0], None: [3.0]}
         }
+        ooffr.drop_source_features_ = True
 
         result = ooffr.predict(X)
         true_answer = np.array([5.8, 2.2, 4, 0.6, 2.4, 4.2])
@@ -449,10 +449,10 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         ooffc.estimator.coef_ = np.array([[0.48251806, -0.16291334]])
         ooffc.estimator.intercept_ = [-0.51943239]
         ooffc.features_creator_ = TargetBasedFeaturesCreator()
-        ooffc.drop_source_features_ = True
         ooffc.features_creator_.mappings_ = {
             1: {0.0: [2 / 3], 1.0: [1 / 3], None: [0.5]}
         }
+        ooffc.drop_source_features_ = True
 
         result = ooffc.predict_proba(X)[:, 1]
         true_answer = np.array([0.69413293, 0.46368326, 0.58346035,
