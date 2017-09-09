@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/Nikolay-Lysenko/dsawl.svg?branch=master)](https://travis-ci.org/Nikolay-Lysenko/dsawl)
+
 # dsawl
 
 ## What is it?
