@@ -1,0 +1,13 @@
+[run]
+branch = True
+source = dsawl
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if .debug:
+    raise AssertionError
+    raise NotImplementedError
+    raise RuntimeError
+    if __name__ == .__main__.:

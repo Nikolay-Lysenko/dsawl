@@ -17,6 +17,7 @@ install:
   - source activate dsawl_ci
   - pip install .
   - pip install codecov
+  - export PYTHONPATH="."  # No data is collected by `coverage` without this.
 
 branches:
   only:
