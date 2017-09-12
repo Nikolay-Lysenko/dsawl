@@ -124,6 +124,44 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         )
         self.assertTrue(np.array_equal(execution_result, true_answer))
 
+    def test_fit_transform_with_keeping_of_sources(self) -> type(None):
+        """
+        Test in-fold combination of `fit` and `transform` on data
+        with one numerical feature and one categorical feature
+        that must be kept.
+
+        :return: None
+        """
+        X, y = get_dataset_for_features_creation()
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean],
+            drop_source_features=False
+        )
+        execution_result = fg.fit_transform(
+            X,
+            y,
+            source_positions=[1]
+        )
+        true_answer = np.array(
+            [[1, 0, 4],
+             [2, 0, 4],
+             [3, 0, 4],
+             [4, 0, 4],
+             [10, 0, 4],
+             [1, 1, 6],
+             [2, 1, 6],
+             [3, 1, 6],
+             [4, 1, 6],
+             [10, 1, 6],
+             [1, -1, 8],
+             [2, -1, 8],
+             [3, -1, 8],
+             [4, -1, 8],
+             [10, -1, 8]],
+            dtype=float
+        )
+        self.assertTrue(np.array_equal(execution_result, true_answer))
+
     def test_fit_transform_with_smoothing(self) -> type(None):
         """
         Test in-fold combination of `fit` and `transform`
