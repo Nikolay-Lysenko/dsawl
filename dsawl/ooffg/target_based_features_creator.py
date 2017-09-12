@@ -44,17 +44,22 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
                           value (if value occurs less times than this
                           parameter, this value is mapped to
                           unconditional aggregate)
+    :param drop_source_features: drop or keep those of initial
+                                 features that are used for
+                                 conditioning over them
     """
 
     def __init__(
             self,
             aggregators: List[Callable] = None,
             smoothing_strength: float = 0,
-            min_frequency: int = 1
+            min_frequency: int = 1,
+            drop_source_features: bool = True
             ):
         self.aggregators = [np.mean] if aggregators is None else aggregators
         self.smoothing_strength = smoothing_strength
         self.min_frequency = min_frequency
+        self.drop_source_features = drop_source_features
         self.mappings_ = dict()
 
     def __compute_aggregate(
@@ -106,16 +111,12 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
 
     def transform(
             self,
-            X: np.ndarray,
-            drop_source_features: bool = True
+            X: np.ndarray
             ) -> np.ndarray:
         """
         Augment `X` with learnt conditional aggregates.
 
         :param X: feature representation to be augmented
-        :param drop_source_features: drop or keep those of initial
-                                     features that are used for
-                                     conditioning over them
         :return: transformed data
         """
         transformed_X = X.copy()
@@ -130,7 +131,7 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
                     np.tile(conditional_aggregates, (sum(feature == value), 1))
             new_features[np.isnan(new_features[:, 0]), :] = mappings[None]
             transformed_X = np.hstack((transformed_X, new_features))
-        if drop_source_features:
+        if self.drop_source_features:
             relevant_columns = list(filter(
                 lambda x: x not in self.mappings_.keys(),
                 range(transformed_X.shape[1])
@@ -145,8 +146,7 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             source_positions: List[int],
             n_splits: int,
             shuffle: bool = False,
-            random_state: int = None,
-            drop_source_features: bool = True
+            random_state: int = None
             ) -> np.ndarray:
         """
         Enrich `X` with features based on `y` in a manner that
@@ -163,25 +163,21 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         :param shuffle: whether to shuffle objects before splitting
         :param random_state: pseudo-random numbers generator seed
                              for shuffling
-        :param drop_source_features: drop or keep those of initial
-                                     features that are used for
-                                     conditioning over them
         :return: transformed feature representation
         """
         new_n_columns = (X.shape[1] +
                          len(self.aggregators) * len(source_positions) -
-                         drop_source_features * len(source_positions))
+                         self.drop_source_features * len(source_positions))
         transformed_X = np.full((X.shape[0], new_n_columns), np.nan)
         kf = KFold(n_splits, shuffle, random_state)
         for fit_indices, transform_indices in kf.split(X):
             self.fit(
-                X[fit_indices],
+                X[fit_indices, :],
                 y[fit_indices],
                 source_positions
             )
             transformed_X[transform_indices, :] = self.transform(
-                X[transform_indices],
-                drop_source_features
+                X[transform_indices, :]
             )
         self.fit(X, y, source_positions)
         return transformed_X
