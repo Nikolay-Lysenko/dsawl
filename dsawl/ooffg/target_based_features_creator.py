@@ -13,6 +13,7 @@ features that are derived in the following manner:
 from typing import List, Callable
 
 import numpy as np
+import pandas as pd
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import KFold
@@ -62,22 +63,30 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         self.drop_source_features = drop_source_features
         self.mappings_ = dict()
 
-    def __compute_aggregate(
+    def __process_raw_aggregator(
             self,
-            mask: np.array,
-            target: np.array,
-            aggregator: Callable
-            ) -> float:
-        n_occurrences = sum(mask)
-        if n_occurrences < self.min_frequency:
-            return aggregator(target)
-        else:
-            numerator = (
-                n_occurrences * aggregator(target[mask]) +
-                self.smoothing_strength * aggregator(target)
-            )
-            denominator = n_occurrences + self.smoothing_strength
-            return numerator / denominator
+            aggregator: Callable,
+            target: np.ndarray,
+            ) -> Callable:
+        # Make `aggregator` smoothing towards unconditional aggregates
+        # according to class parameters.
+
+        def compute_aggregate(ser):
+            n_occurrences = len(ser.index)
+            if n_occurrences < self.min_frequency:
+                return aggregator(target)
+            else:
+                numerator = (
+                    n_occurrences * aggregator(ser) +
+                    self.smoothing_strength * aggregator(target)
+                )
+                denominator = n_occurrences + self.smoothing_strength
+                return numerator / denominator
+
+        # `gb.agg(funcs)` requires unique names of all functions from `funcs`.
+        func = compute_aggregate
+        func.__name__ = aggregator.__name__
+        return func
 
     def fit(
             self,
@@ -97,14 +106,24 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         :return: fitted instance
         """
         for position in source_positions:
-            feature = X[:, position]
-            self.mappings_[position] = {
-                k: [self.__compute_aggregate(feature == k, y, agg)
-                    for agg in self.aggregators]
-                for k in np.unique(feature)
-            }
-            # `None` is a reserved key for unseen values.
-            self.mappings_[position][None] = [
+            feature = X[:, position].reshape((-1, 1))
+            target = y.reshape((-1, 1))
+            df = pd.DataFrame(np.hstack((feature, target)), columns=['x', 'y'])
+            mapping = df.groupby('x')['y'].agg(
+                [self.__process_raw_aggregator(agg, target)
+                 for agg in self.aggregators]
+            )
+            mapping = pd.DataFrame(
+                np.hstack(
+                    (mapping.index.values.reshape((-1, 1)), mapping.values)
+                ),
+                columns=[str(position)] +
+                        ['agg_{}'.format(x)
+                         for x in range(len(self.aggregators))]
+            )
+            self.mappings_[position] = mapping
+            # '__unseen__' is a reserved key for unseen values.
+            self.mappings_[position].loc['__unseen__'] = [np.nan] + [
                 agg(y) for agg in self.aggregators
             ]
         return self
@@ -119,18 +138,20 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         :param X: feature representation to be augmented
         :return: transformed data
         """
-        transformed_X = X.copy()
-        for position, mappings in self.mappings_.items():
-            feature = X[:, position]
-            n_new = len(next(iter(mappings.values())))
-            new_features = np.full((X.shape[0], n_new), np.nan)
-            for value, conditional_aggregates in mappings.items():
-                if value is None:
-                    continue
-                new_features[[feature == value]] = \
-                    np.tile(conditional_aggregates, (sum(feature == value), 1))
-            new_features[np.isnan(new_features[:, 0]), :] = mappings[None]
-            transformed_X = np.hstack((transformed_X, new_features))
+        transformed_df = pd.DataFrame(
+            X,
+            columns=[str(x) for x in range(X.shape[1])]
+        )
+        for position, mapping in self.mappings_.items():
+            transformed_df = transformed_df.merge(
+                mapping, on=str(position), how='left'
+            )
+            n_new = len(mapping.columns)
+            default_values = mapping.loc['__unseen__'].values
+            transformed_df.loc[
+                pd.isnull(transformed_df.iloc[:, -1]), -n_new:
+            ] = default_values
+        transformed_X = transformed_df.values
         if self.drop_source_features:
             relevant_columns = list(filter(
                 lambda x: x not in self.mappings_.keys(),
