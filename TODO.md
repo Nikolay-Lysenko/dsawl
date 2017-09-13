@@ -1,2 +1,1 @@
-* Run load testing and optimize bottle-necks.
-* Support rolling (time-preserving) splits.
+* Support rolling (time-preserving) splits with `TimeSeriesSplit`.
