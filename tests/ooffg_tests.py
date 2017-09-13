@@ -11,6 +11,8 @@ import unittest
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
+
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
 from dsawl.ooffg.target_based_features_creator import (
@@ -402,9 +404,14 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         ooffr.estimator.intercept_ = -2.8
         ooffr.features_creator_ = TargetBasedFeaturesCreator()
         ooffr.features_creator_.mappings_ = {
-            1: {0.0: [4.0], 1.0: [2.0], None: [3.0]}
+            1: pd.DataFrame(
+                [[0.0, 4.0],
+                 [1.0, 2.0],
+                 [np.nan, 3.0]],
+                columns=['1', 'agg_0'],
+                index=[0, 1, '__unseen__']
+            )
         }
-        ooffr.drop_source_features_ = True
 
         result = ooffr.predict(X)
         true_answer = np.array([5.8, 2.2, 4, 0.6, 2.4, 4.2])
@@ -488,9 +495,14 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         ooffc.estimator.intercept_ = [-0.51943239]
         ooffc.features_creator_ = TargetBasedFeaturesCreator()
         ooffc.features_creator_.mappings_ = {
-            1: {0.0: [2 / 3], 1.0: [1 / 3], None: [0.5]}
+            1: pd.DataFrame(
+                [[0.0, 2 / 3],
+                 [1.0, 1 / 3],
+                 [np.nan, 0.5]],
+                columns=['1', 'agg_0'],
+                index=[0, 1, '__unseen__']
+            )
         }
-        ooffc.drop_source_features_ = True
 
         result = ooffc.predict_proba(X)[:, 1]
         true_answer = np.array([0.69413293, 0.46368326, 0.58346035,

@@ -76,6 +76,8 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             fit_kwargs: Dict[Any, Any] = None,
             save_training_features_as_attr: bool = False
             ) -> 'BaseOutOfFoldFeaturesEstimator':
+        # Run all internal logic of fitting.
+
         self.features_creator_ = TargetBasedFeaturesCreator(
             self.aggregators,
             self.smoothing_strength,
