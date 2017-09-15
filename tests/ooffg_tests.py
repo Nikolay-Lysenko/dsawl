@@ -29,7 +29,8 @@ def get_dataset_for_features_creation() -> Tuple[np.ndarray, np.ndarray]:
     such that they can be interpreted both as numerical or as
     categorical.
 
-    :return: X and y
+    :return:
+        features array and target array
     """
     dataset = np.array(
         [[1, 0, 1],
@@ -63,7 +64,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test in-fold combination of `fit` and `transform` on data
         with one numerical feature and one categorical feature.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
@@ -97,7 +99,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test in-fold combination of `fit` and `transform` on data
         with two categorical features.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
@@ -132,7 +135,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         with one numerical feature and one categorical feature
         that must be kept.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(
@@ -169,7 +173,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test in-fold combination of `fit` and `transform`
         with smoothing.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(
@@ -206,7 +211,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test in-fold combination of `fit` and `transform`
         with threshold on number of occurrences.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         X = X[:-1, :]
@@ -244,7 +250,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test `fit_transform_out_of_fold` method on data
         with one numerical feature and one categorical feature.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
@@ -279,7 +286,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test `fit_transform_out_of_fold` method on data
         with two categorical features.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
@@ -316,7 +324,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         occur in folds other than a current one. It must fill it with
         unconditional aggregate instead of missing placeholder.
 
-        :return: None
+        :return:
+            None
         """
         X = np.array(
             [[4, 1],
@@ -348,7 +357,8 @@ def get_dataset_for_regression() -> Tuple[np.ndarray, np.ndarray]:
     Get dataset with one numerical feature, one label-encoded
     categorical feature, and a numerical target variable.
 
-    :return: X and y
+    :return:
+        features array and target array
     """
     dataset = np.array(
         [[3, 0, 6],
@@ -372,7 +382,8 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         """
         Test `fit` method.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
@@ -390,7 +401,8 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         Test `predict` method.
         Note that `fit_predict` must produce different result.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
@@ -421,7 +433,8 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         """
         Test `fit_predict` method.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
@@ -439,7 +452,8 @@ def get_dataset_for_classification() -> Tuple[np.ndarray, np.ndarray]:
     Get dataset with one numerical feature, one label-encoded
     categorical feature, and a binary class label.
 
-    :return: X and y
+    :return:
+        features array and target array
     """
     dataset = np.array(
         [[3, 0, 1],
@@ -463,7 +477,8 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         """
         Test `fit` method.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
@@ -481,7 +496,8 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         Test `predict_proba` method.
         Note that `fit_predict_proba` must produce different result.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
@@ -513,7 +529,8 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         """
         Test `fit_predict_proba` method.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(

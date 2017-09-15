@@ -24,24 +24,30 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
     Parent class for regression and classification estimators.
     It should not be instantiated.
 
-    :param estimator: internal estimator to be fitted
-    :param estimator_kwargs: parameters of internal estimator
-    :param n_splits: number of folds for feature generation
-    :param shuffle: whether to shuffle objects before splitting
-    :param random_state: pseudo-random numbers generator seed for
-                         shuffling only, not for training
-    :param aggregators: functions that compute aggregates
-    :param smoothing_strength: strength of smoothing towards
-                               unconditional aggregates for
-                               target-based features creation
-    :param min_frequency: minimal number of occurrences of a feature's
-                          value (if value occurs less times than this
-                          parameter, this value is mapped to
-                          unconditional aggregate)
-    :param drop_source_features: drop or keep at training stage
-                                 those of initial features that are
-                                 used for conditioning over them
-                                 at new features generation stage
+    :param estimator:
+        internal estimator to be fitted
+    :param estimator_kwargs:
+        parameters of internal estimator
+    :param n_splits:
+        number of folds for feature generation
+    :param shuffle:
+        whether to shuffle objects before splitting
+    :param random_state:
+        pseudo-random numbers generator seed for shuffling only,
+        not for training
+    :param aggregators:
+        functions that compute aggregates
+    :param smoothing_strength:
+        strength of smoothing towards unconditional aggregates for
+        target-based features creation
+    :param min_frequency:
+        minimal number of occurrences of a feature's value (if value
+        occurs less times than this parameter, this value is mapped to
+        unconditional aggregate)
+    :param drop_source_features:
+        drop or keep at training stage those of initial features
+        that are used for conditioning over them at new features'
+        generation stage
     """
 
     def __init__(
@@ -113,12 +119,16 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         Risk of overfitting is reduced, because for each object
         its own target is not used for generation of its features.
 
-        :param X: features
-        :param y: target
-        :param source_positions: indices of initial features to be
-                                 used as conditions
-        :param fit_kwargs: settings of internal estimator fit
-        :return: fitted estimator
+        :param X:
+            features
+        :param y:
+            target
+        :param source_positions:
+            indices of initial features to be used as conditions
+        :param fit_kwargs:
+            settings of internal estimator fit
+        :return:
+            fitted estimator (instance of the class)
         """
         self._fit(X, y, source_positions, fit_kwargs,
                   save_training_features_as_attr=False)
@@ -137,8 +147,10 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         If you need in predictions for learning sample, use
         `fit_predict` method.
 
-        :param X: features of objects
-        :return: predictions
+        :param X:
+            features of objects
+        :return:
+            predictions
         """
         if self.features_creator_ is None:
             raise RuntimeError("Estimator must be trained before predicting")
@@ -156,12 +168,16 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         """
         Train model and make predictions for the training set.
 
-        :param X: features
-        :param y: target
-        :param source_positions: indices of initial features to be
-                                 used as conditions
-        :param fit_kwargs: settings of internal estimator fit
-        :return: predictions
+        :param X:
+            features
+        :param y:
+            target
+        :param source_positions:
+            indices of initial features to be used as conditions
+        :param fit_kwargs:
+            settings of internal estimator fit
+        :return:
+            predictions
         """
         try:
             self._fit(X, y, source_positions, fit_kwargs,
@@ -198,8 +214,10 @@ class OutOfFoldFeaturesClassifier(
         If you need in probabilities' predictions for learning sample,
         use `fit_predict_proba` method.
 
-        :param X: features of objects
-        :return: predicted probabilities
+        :param X:
+            features of objects
+        :return:
+            predicted probabilities
         """
         if not hasattr(self.estimator, "predict_proba"):
             raise NotImplementedError(
@@ -222,12 +240,16 @@ class OutOfFoldFeaturesClassifier(
         Train model and predict class probabilities for the
         training set.
 
-        :param X: features
-        :param y: target
-        :param source_positions: indices of initial features to be
-                                 used as conditions
-        :param fit_kwargs: settings of internal estimator fit
-        :return: predicted probabilities
+        :param X:
+            features
+        :param y:
+            target
+        :param source_positions:
+            indices of initial features to be used as conditions
+        :param fit_kwargs:
+            settings of internal estimator fit
+        :return:
+            predicted probabilities
         """
         if not hasattr(self.estimator, "predict_proba"):
             raise NotImplementedError(

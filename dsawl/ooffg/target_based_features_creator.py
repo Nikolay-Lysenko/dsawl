@@ -38,16 +38,17 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
     Also this class allows avoiding overfitting by generating
     new features based only on out-of-fold values of target.
 
-    :param aggregators: functions that compute aggregates
-    :param smoothing_strength: strength of smoothing towards
-                               unconditional aggregates
-    :param min_frequency: minimal number of occurrences of a feature's
-                          value (if value occurs less times than this
-                          parameter, this value is mapped to
-                          unconditional aggregate)
-    :param drop_source_features: drop or keep those of initial
-                                 features that are used for
-                                 conditioning over them
+    :param aggregators:
+        functions that compute aggregates
+    :param smoothing_strength:
+        strength of smoothing towards unconditional aggregates
+    :param min_frequency:
+        minimal number of occurrences of a feature's value (if value
+        occurs less times than this parameter, this value is mapped to
+        unconditional aggregate)
+    :param drop_source_features:
+        drop or keep those of initial features that are used for
+        conditioning over them
     """
 
     def __init__(
@@ -99,11 +100,14 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         In other words, memorize mappings from initial values
         of selected columns to conditional aggregates.
 
-        :param X: features
-        :param y: target
-        :param source_positions: indices of initial features to be
-                                 used as conditions
-        :return: fitted instance
+        :param X:
+            features
+        :param y:
+            target
+        :param source_positions:
+            indices of initial features to be used as conditions
+        :return:
+            fitted instance
         """
         for position in source_positions:
             feature = X[:, position].reshape((-1, 1))
@@ -135,8 +139,10 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         """
         Augment `X` with learnt conditional aggregates.
 
-        :param X: feature representation to be augmented
-        :return: transformed data
+        :param X:
+            feature representation to be augmented
+        :return:
+            transformed data
         """
         transformed_df = pd.DataFrame(
             X,
@@ -176,15 +182,20 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         value of target variable is not used for generation of
         its new features.
 
-        :param X: feature representation to be augmented
-        :param y: target to be incorporated in new features
-        :param source_positions: indices of initial features to be
-                                 used as conditions
-        :param n_splits: number of folds for feature generation
-        :param shuffle: whether to shuffle objects before splitting
-        :param random_state: pseudo-random numbers generator seed
-                             for shuffling
-        :return: transformed feature representation
+        :param X:
+            feature representation to be augmented
+        :param y:
+            target to be incorporated in new features
+        :param source_positions:
+            indices of initial features to be used as conditions
+        :param n_splits:
+            number of folds for feature generation
+        :param shuffle:
+            whether to shuffle objects before splitting
+        :param random_state:
+            pseudo-random numbers generator seed for shuffling
+        :return:
+            transformed feature representation
         """
         new_n_columns = (X.shape[1] +
                          len(self.aggregators) * len(source_positions) -
