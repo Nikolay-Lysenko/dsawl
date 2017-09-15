@@ -13,6 +13,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
+from sklearn.model_selection import KFold, TimeSeriesSplit
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
 from dsawl.ooffg.target_based_features_creator import (
@@ -254,12 +255,14 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median],
+            splitter=KFold(n_splits=5)
+        )
         execution_result = fg.fit_transform_out_of_fold(
             X,
             y,
-            source_positions=[1],
-            n_splits=5
+            source_positions=[1]
         )
         true_answer = np.array(
             [[1, 7, 7],
@@ -290,12 +293,14 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median],
+            splitter=KFold(n_splits=5)
+        )
         execution_result = fg.fit_transform_out_of_fold(
             X,
             y,
-            source_positions=[0, 1],
-            n_splits=5
+            source_positions=[0, 1]
         )
         true_answer = np.array(
             [[4, 4, 7, 7],
@@ -313,6 +318,40 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
              [4, 4, 5.5, 5.5],
              [5, 5, 5.5, 5.5],
              [11, 11, 5.5, 5.5]],
+            dtype=float
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+    def test_fit_transform_out_of_fold_on_ordered_data(self) -> type(None):
+        """
+        Test `fit_transform_out_of_fold` method on data
+        with ordered observations. Ordering implies that
+        `TimeSeriesSplit` must be used.
+
+        :return:
+            None
+        """
+        X, y = get_dataset_for_features_creation()
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median],
+            splitter=TimeSeriesSplit(n_splits=5)
+        )
+        execution_result = fg.fit_transform_out_of_fold(
+            X,
+            y,
+            source_positions=[1]
+        )
+        true_answer = np.array(
+            [[1, 4, 3],
+             [2, 4, 3],
+             [3, 3.5, 3.5],
+             [4, 3.5, 3.5],
+             [10, 4.5, 4.5],
+             [1, 38 / 9, 4],
+             [2, 5, 5],
+             [3, 5, 5],
+             [4, 6, 6],
+             [10, 6, 6]],
             dtype=float
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
@@ -340,8 +379,7 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         execution_result = fg.fit_transform_out_of_fold(
             X,
             y,
-            source_positions=[1],
-            n_splits=3
+            source_positions=[1]
         )
         true_answer = np.array(
             [[4, 5, 5],
@@ -388,8 +426,7 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
             LinearRegression(),
-            estimator_kwargs=dict(),
-            n_splits=3
+            estimator_kwargs=dict()
         )
         ooffr.fit(X, y, source_positions=[1])
         learnt_slopes = ooffr.estimator.coef_
@@ -407,8 +444,7 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
             LinearRegression(),
-            estimator_kwargs=dict(),
-            n_splits=3
+            estimator_kwargs=dict()
         )
 
         # Fit it manually.
@@ -439,8 +475,7 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
             LinearRegression(),
-            estimator_kwargs=dict(),
-            n_splits=3
+            estimator_kwargs=dict()
         )
         result = ooffr.fit_predict(X, y, source_positions=[1])
         true_answer = np.array([5.8, 2.2, 4, 1, 1.6, 3.4])
@@ -483,8 +518,7 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
             LogisticRegression(),
-            estimator_kwargs={'random_state': 361},
-            n_splits=3
+            estimator_kwargs={'random_state': 361}
         )
         ooffc.fit(X, y, source_positions=[1])
         learnt_slopes = ooffc.estimator.coef_
@@ -502,8 +536,7 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
             LogisticRegression(),
-            estimator_kwargs={'random_state': 361},
-            n_splits=3
+            estimator_kwargs={'random_state': 361}
         )
 
         # Fit it manually.
@@ -535,8 +568,7 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
             LogisticRegression(),
-            estimator_kwargs={'random_state': 361},
-            n_splits=3
+            estimator_kwargs={'random_state': 361}
         )
         result = ooffc.fit_predict_proba(X, y, source_positions=[1])[:, 1]
         true_answer = np.array([0.68248347, 0.45020866, 0.59004395,

@@ -11,10 +11,14 @@ that are aggregates of target value.
 """
 
 
-from typing import List, Dict, Callable, Any
+from typing import List, Dict, Callable, Union, Any
 
 import numpy as np
+
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
+from sklearn.model_selection import (
+    KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
+)
 
 from .target_based_features_creator import TargetBasedFeaturesCreator
 
@@ -28,13 +32,8 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         internal estimator to be fitted
     :param estimator_kwargs:
         parameters of internal estimator
-    :param n_splits:
-        number of folds for feature generation
-    :param shuffle:
-        whether to shuffle objects before splitting
-    :param random_state:
-        pseudo-random numbers generator seed for shuffling only,
-        not for training
+    :param splitter:
+        object that splits data into folds
     :param aggregators:
         functions that compute aggregates
     :param smoothing_strength:
@@ -54,9 +53,9 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             self,
             estimator: BaseEstimator,
             estimator_kwargs: Dict,
-            n_splits: int,
-            shuffle: bool = False,
-            random_state: int = None,
+            splitter: Union[
+                KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
+            ] = None,
             aggregators: List[Callable] = None,
             smoothing_strength: float = 0,
             min_frequency: int = 1,
@@ -64,9 +63,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             ):
         self.estimator = estimator
         self.estimator.set_params(**estimator_kwargs)
-        self.n_splits = n_splits
-        self.shuffle = shuffle
-        self.random_state = random_state
+        self.splitter = KFold() if splitter is None else splitter
         self.aggregators = [np.mean] if aggregators is None else aggregators
         self.smoothing_strength = smoothing_strength
         self.min_frequency = min_frequency
@@ -86,6 +83,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
 
         self.features_creator_ = TargetBasedFeaturesCreator(
             self.aggregators,
+            self.splitter,
             self.smoothing_strength,
             self.min_frequency,
             self.drop_source_features
@@ -93,10 +91,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         extended_X = self.features_creator_.fit_transform_out_of_fold(
             X,
             y,
-            source_positions,
-            self.n_splits,
-            self.shuffle,
-            self.random_state
+            source_positions
         )
 
         fit_kwargs = dict() if fit_kwargs is None else fit_kwargs
