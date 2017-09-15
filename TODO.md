@@ -1,1 +1,1 @@
-* Support rolling (time-preserving) splits with `TimeSeriesSplit`.
+* Implement a class with on-the-fly model selection.
