@@ -13,6 +13,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
+from sklearn.model_selection import KFold, TimeSeriesSplit
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
 from dsawl.ooffg.target_based_features_creator import (
@@ -29,7 +30,8 @@ def get_dataset_for_features_creation() -> Tuple[np.ndarray, np.ndarray]:
     such that they can be interpreted both as numerical or as
     categorical.
 
-    :return: X and y
+    :return:
+        features array and target array
     """
     dataset = np.array(
         [[1, 0, 1],
@@ -63,7 +65,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test in-fold combination of `fit` and `transform` on data
         with one numerical feature and one categorical feature.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
@@ -97,7 +100,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test in-fold combination of `fit` and `transform` on data
         with two categorical features.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
@@ -132,7 +136,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         with one numerical feature and one categorical feature
         that must be kept.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(
@@ -169,7 +174,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test in-fold combination of `fit` and `transform`
         with smoothing.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         fg = TargetBasedFeaturesCreator(
@@ -206,7 +212,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test in-fold combination of `fit` and `transform`
         with threshold on number of occurrences.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
         X = X[:-1, :]
@@ -244,15 +251,18 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test `fit_transform_out_of_fold` method on data
         with one numerical feature and one categorical feature.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median],
+            splitter=KFold(n_splits=5)
+        )
         execution_result = fg.fit_transform_out_of_fold(
             X,
             y,
-            source_positions=[1],
-            n_splits=5
+            source_positions=[1]
         )
         true_answer = np.array(
             [[1, 7, 7],
@@ -279,15 +289,18 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         Test `fit_transform_out_of_fold` method on data
         with two categorical features.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median],
+            splitter=KFold(n_splits=5)
+        )
         execution_result = fg.fit_transform_out_of_fold(
             X,
             y,
-            source_positions=[0, 1],
-            n_splits=5
+            source_positions=[0, 1]
         )
         true_answer = np.array(
             [[4, 4, 7, 7],
@@ -309,6 +322,40 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
 
+    def test_fit_transform_out_of_fold_on_ordered_data(self) -> type(None):
+        """
+        Test `fit_transform_out_of_fold` method on data
+        with ordered observations. Ordering implies that
+        `TimeSeriesSplit` must be used.
+
+        :return:
+            None
+        """
+        X, y = get_dataset_for_features_creation()
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median],
+            splitter=TimeSeriesSplit(n_splits=5)
+        )
+        execution_result = fg.fit_transform_out_of_fold(
+            X,
+            y,
+            source_positions=[1]
+        )
+        true_answer = np.array(
+            [[1, 4, 3],
+             [2, 4, 3],
+             [3, 3.5, 3.5],
+             [4, 3.5, 3.5],
+             [10, 4.5, 4.5],
+             [1, 38 / 9, 4],
+             [2, 5, 5],
+             [3, 5, 5],
+             [4, 6, 6],
+             [10, 6, 6]],
+            dtype=float
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
     def test_correct_work_with_rare_values(self) -> type(None):
         """
         Test that `fit_transform_out_of_fold` does not produce
@@ -316,7 +363,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         occur in folds other than a current one. It must fill it with
         unconditional aggregate instead of missing placeholder.
 
-        :return: None
+        :return:
+            None
         """
         X = np.array(
             [[4, 1],
@@ -331,8 +379,7 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         execution_result = fg.fit_transform_out_of_fold(
             X,
             y,
-            source_positions=[1],
-            n_splits=3
+            source_positions=[1]
         )
         true_answer = np.array(
             [[4, 5, 5],
@@ -348,7 +395,8 @@ def get_dataset_for_regression() -> Tuple[np.ndarray, np.ndarray]:
     Get dataset with one numerical feature, one label-encoded
     categorical feature, and a numerical target variable.
 
-    :return: X and y
+    :return:
+        features array and target array
     """
     dataset = np.array(
         [[3, 0, 6],
@@ -372,13 +420,13 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         """
         Test `fit` method.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
             LinearRegression(),
-            estimator_kwargs=dict(),
-            n_splits=3
+            estimator_kwargs=dict()
         )
         ooffr.fit(X, y, source_positions=[1])
         learnt_slopes = ooffr.estimator.coef_
@@ -390,13 +438,13 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         Test `predict` method.
         Note that `fit_predict` must produce different result.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
             LinearRegression(),
-            estimator_kwargs=dict(),
-            n_splits=3
+            estimator_kwargs=dict()
         )
 
         # Fit it manually.
@@ -421,13 +469,13 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
         """
         Test `fit_predict` method.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_regression()
         ooffr = OutOfFoldFeaturesRegressor(
             LinearRegression(),
-            estimator_kwargs=dict(),
-            n_splits=3
+            estimator_kwargs=dict()
         )
         result = ooffr.fit_predict(X, y, source_positions=[1])
         true_answer = np.array([5.8, 2.2, 4, 1, 1.6, 3.4])
@@ -439,7 +487,8 @@ def get_dataset_for_classification() -> Tuple[np.ndarray, np.ndarray]:
     Get dataset with one numerical feature, one label-encoded
     categorical feature, and a binary class label.
 
-    :return: X and y
+    :return:
+        features array and target array
     """
     dataset = np.array(
         [[3, 0, 1],
@@ -463,13 +512,13 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         """
         Test `fit` method.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
             LogisticRegression(),
-            estimator_kwargs={'random_state': 361},
-            n_splits=3
+            estimator_kwargs={'random_state': 361}
         )
         ooffc.fit(X, y, source_positions=[1])
         learnt_slopes = ooffc.estimator.coef_
@@ -481,13 +530,13 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         Test `predict_proba` method.
         Note that `fit_predict_proba` must produce different result.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
             LogisticRegression(),
-            estimator_kwargs={'random_state': 361},
-            n_splits=3
+            estimator_kwargs={'random_state': 361}
         )
 
         # Fit it manually.
@@ -513,13 +562,13 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
         """
         Test `fit_predict_proba` method.
 
-        :return: None
+        :return:
+            None
         """
         X, y = get_dataset_for_classification()
         ooffc = OutOfFoldFeaturesClassifier(
             LogisticRegression(),
-            estimator_kwargs={'random_state': 361},
-            n_splits=3
+            estimator_kwargs={'random_state': 361}
         )
         result = ooffc.fit_predict_proba(X, y, source_positions=[1])[:, 1]
         true_answer = np.array([0.68248347, 0.45020866, 0.59004395,

@@ -10,13 +10,15 @@ features that are derived in the following manner:
 """
 
 
-from typing import List, Callable
+from typing import List, Callable, Union
 
 import numpy as np
 import pandas as pd
 
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.model_selection import KFold
+from sklearn.model_selection import (
+    KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
+)
 
 
 class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
@@ -38,26 +40,34 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
     Also this class allows avoiding overfitting by generating
     new features based only on out-of-fold values of target.
 
-    :param aggregators: functions that compute aggregates
-    :param smoothing_strength: strength of smoothing towards
-                               unconditional aggregates
-    :param min_frequency: minimal number of occurrences of a feature's
-                          value (if value occurs less times than this
-                          parameter, this value is mapped to
-                          unconditional aggregate)
-    :param drop_source_features: drop or keep those of initial
-                                 features that are used for
-                                 conditioning over them
+    :param aggregators:
+        functions that compute aggregates
+    :param splitter:
+        object that splits data into folds for out-of-fold
+        transformation
+    :param smoothing_strength:
+        strength of smoothing towards unconditional aggregates
+    :param min_frequency:
+        minimal number of occurrences of a feature's value (if value
+        occurs less times than this parameter, this value is mapped to
+        unconditional aggregate)
+    :param drop_source_features:
+        drop or keep those of initial features that are used for
+        conditioning over them
     """
 
     def __init__(
             self,
             aggregators: List[Callable] = None,
+            splitter: Union[
+                KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
+            ] = None,
             smoothing_strength: float = 0,
             min_frequency: int = 1,
             drop_source_features: bool = True
             ):
         self.aggregators = [np.mean] if aggregators is None else aggregators
+        self.splitter = KFold() if splitter is None else splitter
         self.smoothing_strength = smoothing_strength
         self.min_frequency = min_frequency
         self.drop_source_features = drop_source_features
@@ -99,11 +109,14 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         In other words, memorize mappings from initial values
         of selected columns to conditional aggregates.
 
-        :param X: features
-        :param y: target
-        :param source_positions: indices of initial features to be
-                                 used as conditions
-        :return: fitted instance
+        :param X:
+            features
+        :param y:
+            target
+        :param source_positions:
+            indices of initial features to be used as conditions
+        :return:
+            fitted instance
         """
         for position in source_positions:
             feature = X[:, position].reshape((-1, 1))
@@ -135,8 +148,10 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         """
         Augment `X` with learnt conditional aggregates.
 
-        :param X: feature representation to be augmented
-        :return: transformed data
+        :param X:
+            feature representation to be augmented
+        :return:
+            transformed data
         """
         transformed_df = pd.DataFrame(
             X,
@@ -164,10 +179,7 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             self,
             X: np.ndarray,
             y: np.ndarray,
-            source_positions: List[int],
-            n_splits: int,
-            shuffle: bool = False,
-            random_state: int = None
+            source_positions: List[int]
             ) -> np.ndarray:
         """
         Enrich `X` with features based on `y` in a manner that
@@ -176,22 +188,20 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
         value of target variable is not used for generation of
         its new features.
 
-        :param X: feature representation to be augmented
-        :param y: target to be incorporated in new features
-        :param source_positions: indices of initial features to be
-                                 used as conditions
-        :param n_splits: number of folds for feature generation
-        :param shuffle: whether to shuffle objects before splitting
-        :param random_state: pseudo-random numbers generator seed
-                             for shuffling
-        :return: transformed feature representation
+        :param X:
+            feature representation to be augmented
+        :param y:
+            target to be incorporated in new features
+        :param source_positions:
+            indices of initial features to be used as conditions
+        :return:
+            transformed feature representation
         """
         new_n_columns = (X.shape[1] +
                          len(self.aggregators) * len(source_positions) -
                          self.drop_source_features * len(source_positions))
         transformed_X = np.full((X.shape[0], new_n_columns), np.nan)
-        kf = KFold(n_splits, shuffle, random_state)
-        for fit_indices, transform_indices in kf.split(X):
+        for fit_indices, transform_indices in self.splitter.split(X):
             self.fit(
                 X[fit_indices, :],
                 y[fit_indices],
@@ -200,5 +210,10 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             transformed_X[transform_indices, :] = self.transform(
                 X[transform_indices, :]
             )
+        if isinstance(self.splitter, TimeSeriesSplit):
+            # Drop rows from the earliest fold.
+            transformed_X = transformed_X[
+                ~np.isnan(transformed_X).any(axis=1), :
+            ]
         self.fit(X, y, source_positions)
         return transformed_X
