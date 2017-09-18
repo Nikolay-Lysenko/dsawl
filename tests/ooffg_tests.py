@@ -322,6 +322,49 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
 
+    def test_fit_transform_out_of_fold_with_keeping_of_sources(
+            self
+            ) -> type(None):
+        """
+        Test `fit_transform_out_of_fold` method on data
+        with one numerical feature and one categorical feature
+        that should be kept.
+
+        :return:
+            None
+        """
+        X, y = get_dataset_for_features_creation()
+        X[0, 1] = 2  # Make test more comprehensive, add unseen values.
+        fg = TargetBasedFeaturesCreator(
+            aggregators=[np.mean, np.median],
+            splitter=KFold(n_splits=5),
+            drop_source_features=False
+        )
+        execution_result = fg.fit_transform_out_of_fold(
+            X,
+            y,
+            source_positions=[1]
+        )
+        true_answer = np.array(
+            [[1, 2, 7, 6],
+             [2, 0, 7, 7],
+             [3, 0, 7, 7],
+             [4, 0, 2.5, 2.5],
+             [10, 0, 2.5, 2.5],
+             [1, 1, 6.75, 5.5],
+             [2, 1, 7.5, 7.5],
+             [3, 1, 7.5, 7.5],
+             [4, 1, 7.5, 7.5],
+             [10, 1, 4.5, 4.5],
+             [1, -1, 29 / 3, 8],
+             [2, -1, 29 / 3, 8],
+             [3, -1, 5.5, 5.5],
+             [4, -1, 5.5, 5.5],
+             [10, -1, 5.5, 5.5]],
+            dtype=float
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
     def test_fit_transform_out_of_fold_on_ordered_data(self) -> type(None):
         """
         Test `fit_transform_out_of_fold` method on data

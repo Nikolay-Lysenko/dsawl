@@ -10,4 +10,5 @@ exclude_lines =
     raise AssertionError
     raise NotImplementedError
     raise RuntimeError
+    raise TypeError
     if __name__ == .__main__.:
