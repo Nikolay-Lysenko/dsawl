@@ -31,7 +31,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
     :param estimator:
         internal estimator to be fitted
     :param estimator_kwargs:
-        parameters of internal estimator
+        (hyper)parameters of internal estimator
     :param splitter:
         object that splits data into folds
     :param aggregators:
@@ -61,6 +61,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             min_frequency: int = 1,
             drop_source_features: bool = True
             ):
+        self._can_this_class_have_instances()
         self.estimator = estimator
         self.estimator.set_params(**estimator_kwargs)
         self.splitter = KFold() if splitter is None else splitter
@@ -70,6 +71,11 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         self.drop_source_features = drop_source_features
         self.features_creator_ = None
         self.extended_X_ = None
+
+    @classmethod
+    def _can_this_class_have_instances(cls):
+        # Make this class abstract.
+        raise TypeError('{} must not have any instances.'.format(cls))
 
     def _fit(
             self,
@@ -184,20 +190,31 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
 
 
 class OutOfFoldFeaturesRegressor(
-        BaseOutOfFoldFeaturesEstimator, RegressorMixin):
+        BaseOutOfFoldFeaturesEstimator, RegressorMixin
+        ):
     """
     Regressor that has out-of-fold feature generation before
     training.
     """
-    pass
+
+    @classmethod
+    def _can_this_class_have_instances(cls):
+        # Allow this class to have instances.
+        pass
 
 
 class OutOfFoldFeaturesClassifier(
-        BaseOutOfFoldFeaturesEstimator, ClassifierMixin):
+        BaseOutOfFoldFeaturesEstimator, ClassifierMixin
+        ):
     """
     Classifier that has out-of-fold feature generation before
     training.
     """
+
+    @classmethod
+    def _can_this_class_have_instances(cls):
+        # Allow this class to have instances.
+        pass
 
     def predict_proba(
             self,
