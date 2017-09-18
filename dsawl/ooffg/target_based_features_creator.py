@@ -134,11 +134,11 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
                         ['agg_{}'.format(x)
                          for x in range(len(self.aggregators))]
             )
-            self.mappings_[position] = mapping
             # '__unseen__' is a reserved key for unseen values.
-            self.mappings_[position].loc['__unseen__'] = [np.nan] + [
+            mapping.loc['__unseen__'] = [np.nan] + [
                 agg(y) for agg in self.aggregators
             ]
+            self.mappings_[position] = mapping
         return self
 
     def transform(
@@ -161,10 +161,10 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             transformed_df = transformed_df.merge(
                 mapping, on=str(position), how='left'
             )
-            n_new = len(mapping.columns)
-            default_values = mapping.loc['__unseen__'].values
+            n_new_columns = len(mapping.columns) - 1  # Only aggregates
+            default_values = mapping.loc['__unseen__'].values[1:]
             transformed_df.loc[
-                pd.isnull(transformed_df.iloc[:, -1]), -n_new:
+                pd.isnull(transformed_df.iloc[:, -1]), -n_new_columns:
             ] = default_values
         transformed_X = transformed_df.values
         if self.drop_source_features:
@@ -215,5 +215,5 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             transformed_X = transformed_X[
                 ~np.isnan(transformed_X).any(axis=1), :
             ]
-        self.fit(X, y, source_positions)
+        self.fit(X, y, source_positions)  # Finally, fit to whole dataset.
         return transformed_X
