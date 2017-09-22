@@ -1,7 +1,7 @@
 """
-This module contains tests of code from `dsawl/ooffg` directory.
-Code that is tested here provides out-of-fold feature generation
-functionality ('ooffg' is an abbreviation for this procedure).
+This module contains tests of code from `../dsawl/target_encoding`
+directory. Code that is tested here provides functionality for
+out-of-fold feature generation from target variable.
 
 @author: Nikolay Lysenko
 """
@@ -16,11 +16,9 @@ import pandas as pd
 from sklearn.model_selection import KFold, TimeSeriesSplit
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
-from dsawl.ooffg.target_based_features_creator import (
-    TargetBasedFeaturesCreator
-)
-from dsawl.ooffg.estimators import (
-    OutOfFoldFeaturesRegressor, OutOfFoldFeaturesClassifier
+from dsawl.target_encoding.target_encoder import TargetEncoder
+from dsawl.target_encoding.estimators import (
+    OutOfFoldTargetEncodingRegressor, OutOfFoldTargetEncodingClassifier
 )
 
 
@@ -55,9 +53,9 @@ def get_dataset_for_features_creation() -> Tuple[np.ndarray, np.ndarray]:
     return X, y
 
 
-class TestTargetBasedFeaturesCreator(unittest.TestCase):
+class TestTargetEncoder(unittest.TestCase):
     """
-    Tests of `TargetBasedFeaturesCreator` class.
+    Tests of `TargetEncoder` class.
     """
 
     def test_fit_transform(self) -> type(None):
@@ -69,8 +67,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
-        execution_result = fg.fit_transform(
+        target_encoder = TargetEncoder(aggregators=[np.mean, np.median])
+        execution_result = target_encoder.fit_transform(
             X,
             y,
             source_positions=[1]
@@ -104,8 +102,8 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(aggregators=[np.mean, np.median])
-        execution_result = fg.fit_transform(
+        target_encoder = TargetEncoder(aggregators=[np.mean, np.median])
+        execution_result = target_encoder.fit_transform(
             X,
             y,
             source_positions=[0, 1]
@@ -140,11 +138,11 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(
+        target_encoder = TargetEncoder(
             aggregators=[np.mean],
             drop_source_features=False
         )
-        execution_result = fg.fit_transform(
+        execution_result = target_encoder.fit_transform(
             X,
             y,
             source_positions=[1]
@@ -178,11 +176,11 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(
+        target_encoder = TargetEncoder(
             aggregators=[np.mean, np.median],
             smoothing_strength=5
         )
-        execution_result = fg.fit_transform(
+        execution_result = target_encoder.fit_transform(
             X,
             y,
             source_positions=[1]
@@ -218,11 +216,11 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         X, y = get_dataset_for_features_creation()
         X = X[:-1, :]
         y = y[:-1]
-        fg = TargetBasedFeaturesCreator(
+        target_encoder = TargetEncoder(
             aggregators=[np.mean, np.median],
             min_frequency=5
         )
-        execution_result = fg.fit_transform(
+        execution_result = target_encoder.fit_transform(
             X,
             y,
             source_positions=[1]
@@ -255,11 +253,11 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(
+        target_encoder = TargetEncoder(
             aggregators=[np.mean, np.median],
             splitter=KFold(n_splits=5)
         )
-        execution_result = fg.fit_transform_out_of_fold(
+        execution_result = target_encoder.fit_transform_out_of_fold(
             X,
             y,
             source_positions=[1]
@@ -293,11 +291,11 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(
+        target_encoder = TargetEncoder(
             aggregators=[np.mean, np.median],
             splitter=KFold(n_splits=5)
         )
-        execution_result = fg.fit_transform_out_of_fold(
+        execution_result = target_encoder.fit_transform_out_of_fold(
             X,
             y,
             source_positions=[0, 1]
@@ -335,12 +333,12 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
         """
         X, y = get_dataset_for_features_creation()
         X[0, 1] = 2  # Make test more comprehensive, add unseen values.
-        fg = TargetBasedFeaturesCreator(
+        target_encoder = TargetEncoder(
             aggregators=[np.mean, np.median],
             splitter=KFold(n_splits=5),
             drop_source_features=False
         )
-        execution_result = fg.fit_transform_out_of_fold(
+        execution_result = target_encoder.fit_transform_out_of_fold(
             X,
             y,
             source_positions=[1]
@@ -375,11 +373,11 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_features_creation()
-        fg = TargetBasedFeaturesCreator(
+        target_encoder = TargetEncoder(
             aggregators=[np.mean, np.median],
             splitter=TimeSeriesSplit(n_splits=5)
         )
-        execution_result = fg.fit_transform_out_of_fold(
+        execution_result = target_encoder.fit_transform_out_of_fold(
             X,
             y,
             source_positions=[1]
@@ -416,10 +414,10 @@ class TestTargetBasedFeaturesCreator(unittest.TestCase):
             dtype=float
         )
         y = np.array([2, 4, 6], dtype=float)
-        fg = TargetBasedFeaturesCreator(
+        target_encoder = TargetEncoder(
             aggregators=[np.mean, np.median]
         )
-        execution_result = fg.fit_transform_out_of_fold(
+        execution_result = target_encoder.fit_transform_out_of_fold(
             X,
             y,
             source_positions=[1]
@@ -454,9 +452,9 @@ def get_dataset_for_regression() -> Tuple[np.ndarray, np.ndarray]:
     return X, y
 
 
-class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
+class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
     """
-    Tests of `OutOfFoldFeaturesRegressor` class.
+    Tests of `OutOfFoldTargetEncodingRegressor` class.
     """
 
     def test_fit(self) -> type(None):
@@ -467,12 +465,12 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_regression()
-        ooffr = OutOfFoldFeaturesRegressor(
+        rgr = OutOfFoldTargetEncodingRegressor(
             LinearRegression(),
             estimator_kwargs=dict()
         )
-        ooffr.fit(X, y, source_positions=[1])
-        learnt_slopes = ooffr.estimator.coef_
+        rgr.fit(X, y, source_positions=[1])
+        learnt_slopes = rgr.estimator.coef_
         true_answer = np.array([1.8, 0.8])
         self.assertTrue(np.allclose(learnt_slopes, true_answer))
 
@@ -485,16 +483,16 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_regression()
-        ooffr = OutOfFoldFeaturesRegressor(
+        rgr = OutOfFoldTargetEncodingRegressor(
             LinearRegression(),
             estimator_kwargs=dict()
         )
 
         # Fit it manually.
-        ooffr.estimator.coef_ = np.array([1.8, 0.8])
-        ooffr.estimator.intercept_ = -2.8
-        ooffr.features_creator_ = TargetBasedFeaturesCreator()
-        ooffr.features_creator_.mappings_ = {
+        rgr.estimator.coef_ = np.array([1.8, 0.8])
+        rgr.estimator.intercept_ = -2.8
+        rgr.target_encoder_ = TargetEncoder()
+        rgr.target_encoder_.mappings_ = {
             1: pd.DataFrame(
                 [[0.0, 4.0],
                  [1.0, 2.0],
@@ -504,7 +502,7 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
             )
         }
 
-        result = ooffr.predict(X)
+        result = rgr.predict(X)
         true_answer = np.array([5.8, 2.2, 4, 0.6, 2.4, 4.2])
         self.assertTrue(np.allclose(result, true_answer))
 
@@ -516,11 +514,11 @@ class TestOutOfFoldFeaturesRegressor(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_regression()
-        ooffr = OutOfFoldFeaturesRegressor(
+        rgr = OutOfFoldTargetEncodingRegressor(
             LinearRegression(),
             estimator_kwargs=dict()
         )
-        result = ooffr.fit_predict(X, y, source_positions=[1])
+        result = rgr.fit_predict(X, y, source_positions=[1])
         true_answer = np.array([5.8, 2.2, 4, 1, 1.6, 3.4])
         self.assertTrue(np.allclose(result, true_answer))
 
@@ -546,9 +544,9 @@ def get_dataset_for_classification() -> Tuple[np.ndarray, np.ndarray]:
     return X, y
 
 
-class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
+class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
     """
-    Tests of `OutOfFoldFeaturesClassifier` class.
+    Tests of `OutOfFoldTargetEncodingClassifier` class.
     """
 
     def test_fit(self) -> type(None):
@@ -559,12 +557,12 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_classification()
-        ooffc = OutOfFoldFeaturesClassifier(
+        clf = OutOfFoldTargetEncodingClassifier(
             LogisticRegression(),
             estimator_kwargs={'random_state': 361}
         )
-        ooffc.fit(X, y, source_positions=[1])
-        learnt_slopes = ooffc.estimator.coef_
+        clf.fit(X, y, source_positions=[1])
+        learnt_slopes = clf.estimator.coef_
         true_answer = np.array([[0.48251806, -0.16291334]])
         self.assertTrue(np.allclose(learnt_slopes, true_answer))
 
@@ -577,16 +575,16 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_classification()
-        ooffc = OutOfFoldFeaturesClassifier(
+        clf = OutOfFoldTargetEncodingClassifier(
             LogisticRegression(),
             estimator_kwargs={'random_state': 361}
         )
 
         # Fit it manually.
-        ooffc.estimator.coef_ = np.array([[0.48251806, -0.16291334]])
-        ooffc.estimator.intercept_ = [-0.51943239]
-        ooffc.features_creator_ = TargetBasedFeaturesCreator()
-        ooffc.features_creator_.mappings_ = {
+        clf.estimator.coef_ = np.array([[0.48251806, -0.16291334]])
+        clf.estimator.intercept_ = [-0.51943239]
+        clf.target_encoder_ = TargetEncoder()
+        clf.target_encoder_.mappings_ = {
             1: pd.DataFrame(
                 [[0.0, 2 / 3],
                  [1.0, 1 / 3],
@@ -596,7 +594,7 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
             )
         }
 
-        result = ooffc.predict_proba(X)[:, 1]
+        result = clf.predict_proba(X)[:, 1]
         true_answer = np.array([0.69413293, 0.46368326, 0.58346035,
                                 0.47721111, 0.59659543, 0.70553938])
         self.assertTrue(np.allclose(result, true_answer))
@@ -609,11 +607,11 @@ class TestOutOfFoldFeaturesClassifier(unittest.TestCase):
             None
         """
         X, y = get_dataset_for_classification()
-        ooffc = OutOfFoldFeaturesClassifier(
+        clf = OutOfFoldTargetEncodingClassifier(
             LogisticRegression(),
             estimator_kwargs={'random_state': 361}
         )
-        result = ooffc.fit_predict_proba(X, y, source_positions=[1])[:, 1]
+        result = clf.fit_predict_proba(X, y, source_positions=[1])[:, 1]
         true_answer = np.array([0.68248347, 0.45020866, 0.59004395,
                                 0.47044176, 0.60959347, 0.71669408])
         self.assertTrue(np.allclose(result, true_answer))
@@ -623,9 +621,9 @@ def main():
     test_loader = unittest.TestLoader()
     suites_list = []
     testers = [
-        TestTargetBasedFeaturesCreator(),
-        TestOutOfFoldFeaturesRegressor(),
-        TestOutOfFoldFeaturesClassifier()
+        TestTargetEncoder(),
+        TestOutOfFoldTargetEncodingRegressor(),
+        TestOutOfFoldTargetEncodingClassifier()
     ]
     for tester in testers:
         suite = test_loader.loadTestsFromModule(tester)

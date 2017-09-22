@@ -5,6 +5,7 @@ features that are derived in the following manner:
 2) apply aggregating function to each group;
 3) for each object, use corresponding aggregated value
    as a new feature.
+This trick is sometimes called target encoding.
 
 @author: Nikolay Lysenko
 """
@@ -21,7 +22,7 @@ from sklearn.model_selection import (
 )
 
 
-class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
+class TargetEncoder(BaseEstimator, TransformerMixin):
     """
     This class can augment datasets with new features such that
     each of them is conditional value of an aggregating function
@@ -79,7 +80,7 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             target: np.ndarray,
             ) -> Callable:
         # Make `aggregator` smoothing towards unconditional aggregates
-        # according to class parameters.
+        # according to parameters of the current instance.
 
         def compute_aggregate(ser):
             n_occurrences = len(ser.index)
@@ -93,8 +94,8 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
                 denominator = n_occurrences + self.smoothing_strength
                 return numerator / denominator
 
-        # `gb.agg(funcs)` requires unique names of all functions from `funcs`.
         func = compute_aggregate
+        # `gb.agg(funcs)` requires unique names of all functions from `funcs`.
         func.__name__ = aggregator.__name__
         return func
 
@@ -103,7 +104,7 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
             X: np.ndarray,
             y: np.ndarray,
             source_positions: List[int]
-            ) -> 'TargetBasedFeaturesCreator':
+            ) -> 'TargetEncoder':
         """
         Fit to a whole dataset of `X` and `y`.
         In other words, memorize mappings from initial values
@@ -126,13 +127,10 @@ class TargetBasedFeaturesCreator(BaseEstimator, TransformerMixin):
                 [self.__process_raw_aggregator(agg, target)
                  for agg in self.aggregators]
             )
-            mapping = pd.DataFrame(
-                np.hstack(
-                    (mapping.index.values.reshape((-1, 1)), mapping.values)
-                ),
-                columns=[str(position)] +
-                        ['agg_{}'.format(x)
-                         for x in range(len(self.aggregators))]
+            mapping.reset_index(inplace=True)
+            mapping.columns = (
+                [str(position)] +
+                ['agg_{}'.format(x) for x in range(len(self.aggregators))]
             )
             # '__unseen__' is a reserved key for unseen values.
             mapping.loc['__unseen__'] = [np.nan] + [

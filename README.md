@@ -6,7 +6,7 @@
 
 ## What is it?
 This is a set of tools for machine learning. As of now, the list of implemented utilities is as follows:
-* Out-of-fold feature generation, an alternative to one-hot encoding that is more memory efficient if some categorical variables take a lot of distinct values. See `docs/ooffg/demo.ipynb` for more details.
+* Target encoding, an alternative to one-hot encoding and hashing trick that attempts to have both memory efficiency and incorporation of all useful information from initial features. See `docs/target_encoding_demo.ipynb` for more details.
 
 Repository name is a combination of three words: DS, saw, and awl. DS is as an abbreviation for Data Science and the latter two words represent useful tools.
 
@@ -28,5 +28,5 @@ Instructions for other operating systems will be released in the future (probabl
 
 After successful installation, you can use this package like any other regular package from your currently activated virtual environment. For example, you can import a class from it:
 ```
-from dsawl.ooffg.estimators import OutOfFoldFeaturesRegressor
+from dsawl.target_encoding.estimators import OutOfFoldTargetEncodingRegressor
 ```
