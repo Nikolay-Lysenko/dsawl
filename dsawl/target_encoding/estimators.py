@@ -4,8 +4,8 @@ These estimators are learnt with involvement of target-based
 out-of-fold generated features (which can replace some of
 initial features).
 Fitting is implemented in a way that leads to more realistic
-cross-validation scores in comparison with plain generation of features
-that are aggregates of target value.
+cross-validation scores in comparison with plain (i.e., bulk, in-fold)
+generation of features that are aggregates of target value.
 
 @author: Nikolay Lysenko
 """
@@ -20,10 +20,10 @@ from sklearn.model_selection import (
     KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
 )
 
-from .target_based_features_creator import TargetBasedFeaturesCreator
+from .target_encoder import TargetEncoder
 
 
-class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
+class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
     """
     Parent class for regression and classification estimators.
     It should not be instantiated.
@@ -38,7 +38,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         functions that compute aggregates
     :param smoothing_strength:
         strength of smoothing towards unconditional aggregates for
-        target-based features creation
+        target-based features creation (aka target encoding)
     :param min_frequency:
         minimal number of occurrences of a feature's value (if value
         occurs less times than this parameter, this value is mapped to
@@ -61,7 +61,7 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             min_frequency: int = 1,
             drop_source_features: bool = True
             ):
-        self._can_this_class_have_instances()
+        self._can_this_class_have_any_instances()
         self.estimator = estimator
         self.estimator.set_params(**estimator_kwargs)
         self.splitter = KFold() if splitter is None else splitter
@@ -69,11 +69,11 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         self.smoothing_strength = smoothing_strength
         self.min_frequency = min_frequency
         self.drop_source_features = drop_source_features
-        self.features_creator_ = None
+        self.target_encoder_ = None
         self.extended_X_ = None
 
     @classmethod
-    def _can_this_class_have_instances(cls):
+    def _can_this_class_have_any_instances(cls):
         # Make this class abstract.
         raise TypeError('{} must not have any instances.'.format(cls))
 
@@ -84,17 +84,17 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             source_positions: List[int],
             fit_kwargs: Dict[Any, Any] = None,
             save_training_features_as_attr: bool = False
-            ) -> 'BaseOutOfFoldFeaturesEstimator':
+            ) -> 'BaseOutOfFoldTargetEncodingEstimator':
         # Run all internal logic of fitting.
 
-        self.features_creator_ = TargetBasedFeaturesCreator(
+        self.target_encoder_ = TargetEncoder(
             self.aggregators,
             self.splitter,
             self.smoothing_strength,
             self.min_frequency,
             self.drop_source_features
         )
-        extended_X = self.features_creator_.fit_transform_out_of_fold(
+        extended_X = self.target_encoder_.fit_transform_out_of_fold(
             X,
             y,
             source_positions
@@ -112,13 +112,13 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             y: np.ndarray,
             source_positions: List[int],
             fit_kwargs: Dict[Any, Any] = None
-            ) -> 'BaseOutOfFoldFeaturesEstimator':
+            ) -> 'BaseOutOfFoldTargetEncodingEstimator':
         """
         Fit estimator to a dataset where conditional aggregates of
         target variable are generated and used as features.
 
         Risk of overfitting is reduced, because for each object
-        its own target is not used for generation of its features.
+        its own target is not used for generation of its new features.
 
         :param X:
             features
@@ -153,9 +153,9 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
         :return:
             predictions
         """
-        if self.features_creator_ is None:
+        if self.target_encoder_ is None:
             raise RuntimeError("Estimator must be trained before predicting")
-        extended_X = self.features_creator_.transform(X)
+        extended_X = self.target_encoder_.transform(X)
         predictions = self.estimator.predict(extended_X)
         return predictions
 
@@ -189,30 +189,30 @@ class BaseOutOfFoldFeaturesEstimator(BaseEstimator):
             self.extended_X_ = None
 
 
-class OutOfFoldFeaturesRegressor(
-        BaseOutOfFoldFeaturesEstimator, RegressorMixin
+class OutOfFoldTargetEncodingRegressor(
+        BaseOutOfFoldTargetEncodingEstimator, RegressorMixin
         ):
     """
-    Regressor that has out-of-fold feature generation before
-    training.
+    Regressor that has out-of-fold generation of target-based
+    features before training.
     """
 
     @classmethod
-    def _can_this_class_have_instances(cls):
+    def _can_this_class_have_any_instances(cls):
         # Allow this class to have instances.
         pass
 
 
-class OutOfFoldFeaturesClassifier(
-        BaseOutOfFoldFeaturesEstimator, ClassifierMixin
+class OutOfFoldTargetEncodingClassifier(
+        BaseOutOfFoldTargetEncodingEstimator, ClassifierMixin
         ):
     """
-    Classifier that has out-of-fold feature generation before
-    training.
+    Classifier that has out-of-fold generation of target-based
+    features before training.
     """
 
     @classmethod
-    def _can_this_class_have_instances(cls):
+    def _can_this_class_have_any_instances(cls):
         # Allow this class to have instances.
         pass
 
@@ -235,9 +235,9 @@ class OutOfFoldFeaturesClassifier(
             raise NotImplementedError(
                 "Internal estimator has not predict_proba method"
             )
-        if self.features_creator_ is None:
+        if self.target_encoder_ is None:
             raise RuntimeError("Estimator must be trained before predicting")
-        extended_X = self.features_creator_.transform(X)
+        extended_X = self.target_encoder_.transform(X)
         predicted_probabilities = self.estimator.predict_proba(extended_X)
         return predicted_probabilities
 

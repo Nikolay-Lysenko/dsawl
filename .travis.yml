@@ -25,7 +25,7 @@ branches:
   - develop
 
 script:
-  - coverage run tests/ooffg_tests.py
+  - coverage run tests/target_encoding_tests.py
 
 after_success:
   - codecov
