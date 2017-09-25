@@ -11,7 +11,7 @@ This trick is sometimes called target encoding.
 """
 
 
-from typing import List, Callable, Union
+from typing import List, Callable, Union, Optional
 
 import numpy as np
 import pandas as pd
@@ -45,7 +45,7 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         functions that compute aggregates
     :param splitter:
         object that splits data into folds for out-of-fold
-        transformation
+        transformation, default schema is Leave-One-Out.
     :param smoothing_strength:
         strength of smoothing towards unconditional aggregates
     :param min_frequency:
@@ -59,16 +59,16 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
 
     def __init__(
             self,
-            aggregators: List[Callable] = None,
-            splitter: Union[
+            aggregators: Optional[List[Callable]] = None,
+            splitter: Optional[Union[
                 KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
-            ] = None,
-            smoothing_strength: float = 0,
-            min_frequency: int = 1,
-            drop_source_features: bool = True
+            ]] = None,
+            smoothing_strength: Optional[float] = 0,
+            min_frequency: Optional[int] = 1,
+            drop_source_features: Optional[bool] = True
             ):
         self.aggregators = [np.mean] if aggregators is None else aggregators
-        self.splitter = KFold() if splitter is None else splitter
+        self.splitter = splitter
         self.smoothing_strength = smoothing_strength
         self.min_frequency = min_frequency
         self.drop_source_features = drop_source_features
@@ -195,6 +195,8 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :return:
             transformed feature representation
         """
+        if self.splitter is None:
+            self.splitter = KFold(X.shape[0])
         new_n_columns = (X.shape[1] +
                          len(self.aggregators) * len(source_positions) -
                          self.drop_source_features * len(source_positions))
