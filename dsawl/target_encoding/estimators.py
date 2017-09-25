@@ -33,7 +33,8 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
     :param estimator_kwargs:
         (hyper)parameters of internal estimator
     :param splitter:
-        object that splits data into folds
+        object that splits data into folds, default schema is
+        Leave-One-Out
     :param aggregators:
         functions that compute aggregates
     :param smoothing_strength:
@@ -64,7 +65,7 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         self._can_this_class_have_any_instances()
         self.estimator = estimator
         self.estimator.set_params(**estimator_kwargs)
-        self.splitter = KFold() if splitter is None else splitter
+        self.splitter = splitter
         self.aggregators = [np.mean] if aggregators is None else aggregators
         self.smoothing_strength = smoothing_strength
         self.min_frequency = min_frequency

@@ -320,6 +320,44 @@ class TestTargetEncoder(unittest.TestCase):
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
 
+    def test_fit_transform_out_of_fold_with_loo(self) -> type(None):
+        """
+        Test `fit_transform_out_of_fold` method on data
+        with one numerical feature and one categorical feature
+        and Leave-One-Out (LOO) splitting schema.
+
+        :return:
+            None
+        """
+        X, y = get_dataset_for_features_creation()
+        target_encoder = TargetEncoder(
+            aggregators=[np.mean, np.median]
+        )
+        execution_result = target_encoder.fit_transform_out_of_fold(
+            X,
+            y,
+            source_positions=[1]
+        )
+        true_answer = np.array(
+            [[1, 4.75, 3.5],
+             [2, 4.5, 3.5],
+             [3, 4.25, 3],
+             [4, 4, 2.5],
+             [10, 2.5, 2.5],
+             [1, 6.75, 5.5],
+             [2, 6.5, 5.5],
+             [3, 6.25, 5],
+             [4, 6, 4.5],
+             [10, 4.5, 4.5],
+             [1, 8.75, 7.5],
+             [2, 8.5, 7.5],
+             [3, 8.25, 7],
+             [4, 8, 6.5],
+             [10, 6.5, 6.5]],
+            dtype=float
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
     def test_fit_transform_out_of_fold_with_keeping_of_sources(
             self
             ) -> type(None):
@@ -467,7 +505,8 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
         X, y = get_dataset_for_regression()
         rgr = OutOfFoldTargetEncodingRegressor(
             LinearRegression(),
-            estimator_kwargs=dict()
+            estimator_kwargs=dict(),
+            splitter=KFold()
         )
         rgr.fit(X, y, source_positions=[1])
         learnt_slopes = rgr.estimator.coef_
@@ -516,7 +555,8 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
         X, y = get_dataset_for_regression()
         rgr = OutOfFoldTargetEncodingRegressor(
             LinearRegression(),
-            estimator_kwargs=dict()
+            estimator_kwargs=dict(),
+            splitter=KFold()
         )
         result = rgr.fit_predict(X, y, source_positions=[1])
         true_answer = np.array([5.8, 2.2, 4, 1, 1.6, 3.4])
@@ -559,7 +599,8 @@ class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
         X, y = get_dataset_for_classification()
         clf = OutOfFoldTargetEncodingClassifier(
             LogisticRegression(),
-            estimator_kwargs={'random_state': 361}
+            estimator_kwargs={'random_state': 361},
+            splitter=KFold()
         )
         clf.fit(X, y, source_positions=[1])
         learnt_slopes = clf.estimator.coef_
@@ -609,7 +650,8 @@ class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
         X, y = get_dataset_for_classification()
         clf = OutOfFoldTargetEncodingClassifier(
             LogisticRegression(),
-            estimator_kwargs={'random_state': 361}
+            estimator_kwargs={'random_state': 361},
+            splitter=KFold()
         )
         result = clf.fit_predict_proba(X, y, source_positions=[1])[:, 1]
         true_answer = np.array([0.68248347, 0.45020866, 0.59004395,

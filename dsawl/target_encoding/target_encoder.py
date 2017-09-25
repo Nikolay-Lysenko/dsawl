@@ -45,7 +45,7 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         functions that compute aggregates
     :param splitter:
         object that splits data into folds for out-of-fold
-        transformation
+        transformation, default schema is Leave-One-Out.
     :param smoothing_strength:
         strength of smoothing towards unconditional aggregates
     :param min_frequency:
@@ -68,7 +68,7 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             drop_source_features: Optional[bool] = True
             ):
         self.aggregators = [np.mean] if aggregators is None else aggregators
-        self.splitter = KFold() if splitter is None else splitter
+        self.splitter = splitter
         self.smoothing_strength = smoothing_strength
         self.min_frequency = min_frequency
         self.drop_source_features = drop_source_features
@@ -195,6 +195,8 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :return:
             transformed feature representation
         """
+        if self.splitter is None:
+            self.splitter = KFold(X.shape[0])
         new_n_columns = (X.shape[1] +
                          len(self.aggregators) * len(source_positions) -
                          self.drop_source_features * len(source_positions))
