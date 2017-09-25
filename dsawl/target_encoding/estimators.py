@@ -11,7 +11,7 @@ generation of features that are aggregates of target value.
 """
 
 
-from typing import List, Dict, Callable, Union, Any
+from typing import List, Dict, Callable, Union, Any, Optional
 
 import numpy as np
 
@@ -53,13 +53,13 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
             self,
             estimator: BaseEstimator,
             estimator_kwargs: Dict,
-            splitter: Union[
+            splitter: Optional[Union[
                 KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
-            ] = None,
-            aggregators: List[Callable] = None,
-            smoothing_strength: float = 0,
-            min_frequency: int = 1,
-            drop_source_features: bool = True
+            ]] = None,
+            aggregators: Optional[List[Callable]] = None,
+            smoothing_strength: Optional[float] = 0,
+            min_frequency: Optional[int] = 1,
+            drop_source_features: Optional[bool] = True
             ):
         self._can_this_class_have_any_instances()
         self.estimator = estimator
@@ -82,8 +82,8 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
             X: np.ndarray,
             y: np.ndarray,
             source_positions: List[int],
-            fit_kwargs: Dict[Any, Any] = None,
-            save_training_features_as_attr: bool = False
+            fit_kwargs: Optional[Dict[Any, Any]] = None,
+            save_training_features_as_attr: Optional[bool] = False
             ) -> 'BaseOutOfFoldTargetEncodingEstimator':
         # Run all internal logic of fitting.
 
@@ -111,7 +111,7 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
             X: np.ndarray,
             y: np.ndarray,
             source_positions: List[int],
-            fit_kwargs: Dict[Any, Any] = None
+            fit_kwargs: Optional[Dict[Any, Any]] = None
             ) -> 'BaseOutOfFoldTargetEncodingEstimator':
         """
         Fit estimator to a dataset where conditional aggregates of
@@ -164,7 +164,7 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
             X: np.ndarray,
             y: np.ndarray,
             source_positions: List[int],
-            fit_kwargs: Dict[Any, Any] = None
+            fit_kwargs: Optional[Dict[Any, Any]] = None
             ) -> np.ndarray:
         """
         Train model and make predictions for the training set.
@@ -246,7 +246,7 @@ class OutOfFoldTargetEncodingClassifier(
             X: np.ndarray,
             y: np.ndarray,
             source_positions: List[int],
-            fit_kwargs: Dict[Any, Any] = None
+            fit_kwargs: Optional[Dict[Any, Any]] = None
             ) -> np.ndarray:
         """
         Train model and predict class probabilities for the

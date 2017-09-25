@@ -11,7 +11,7 @@ This trick is sometimes called target encoding.
 """
 
 
-from typing import List, Callable, Union
+from typing import List, Callable, Union, Optional
 
 import numpy as np
 import pandas as pd
@@ -59,13 +59,13 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
 
     def __init__(
             self,
-            aggregators: List[Callable] = None,
-            splitter: Union[
+            aggregators: Optional[List[Callable]] = None,
+            splitter: Optional[Union[
                 KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
-            ] = None,
-            smoothing_strength: float = 0,
-            min_frequency: int = 1,
-            drop_source_features: bool = True
+            ]] = None,
+            smoothing_strength: Optional[float] = 0,
+            min_frequency: Optional[int] = 1,
+            drop_source_features: Optional[bool] = True
             ):
         self.aggregators = [np.mean] if aggregators is None else aggregators
         self.splitter = KFold() if splitter is None else splitter
