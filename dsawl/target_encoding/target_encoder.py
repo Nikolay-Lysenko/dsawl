@@ -119,6 +119,10 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :return:
             fitted instance
         """
+        source_positions = map(
+            lambda x: x + X.shape[1] if x < 0 else x,
+            source_positions
+        )
         for position in source_positions:
             feature = X[:, position].reshape((-1, 1))
             target = y.reshape((-1, 1))
