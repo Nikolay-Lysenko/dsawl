@@ -119,11 +119,9 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :return:
             fitted instance
         """
-        source_positions = map(
-            lambda x: x + X.shape[1] if x < 0 else x,
-            source_positions
-        )
         for position in source_positions:
+            if position < 0:
+                position += X.shape[1]
             feature = X[:, position].reshape((-1, 1))
             target = y.reshape((-1, 1))
             df = pd.DataFrame(np.hstack((feature, target)), columns=['x', 'y'])
