@@ -100,12 +100,15 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         return func
 
     @staticmethod
-    def __reverse_negative_source_positions(source_positions, X):
-        # Allow writing indices like `arr[:-1]` instead of `arr[len(arr)]`.
-        source_positions = map(
+    def __solve_issue_of_negative_indices(
+            source_positions: List[int],
+            X: np.ndarray
+            ) -> List[int]:
+        # Allow writing indices like `arr[-1]` instead of `arr[len(arr)]`.
+        source_positions = list(map(
             lambda x: x + X.shape[1] if x < 0 else x,
             source_positions
-        )
+        ))
         return source_positions
 
     def fit(
@@ -128,7 +131,7 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :return:
             fitted instance
         """
-        for position in self.__reverse_negative_source_positions(
+        for position in self.__solve_issue_of_negative_indices(
                 source_positions,
                 X
                 ):
