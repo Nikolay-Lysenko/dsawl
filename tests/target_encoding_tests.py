@@ -244,6 +244,42 @@ class TestTargetEncoder(unittest.TestCase):
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
 
+    def test_fit_transform_with_negative_source_positions(self) -> type(None):
+        """
+        Test in-fold combination of `fit` and `transform` on data
+        with one numerical feature and one categorical feature
+        where source positions are counted in reversed order.
+
+        :return:
+            None
+        """
+        X, y = get_dataset_for_features_creation()
+        target_encoder = TargetEncoder(aggregators=[np.mean, np.median])
+        execution_result = target_encoder.fit_transform(
+            X,
+            y,
+            source_positions=[-1]
+        )
+        true_answer = np.array(
+            [[1, 4, 3],
+             [2, 4, 3],
+             [3, 4, 3],
+             [4, 4, 3],
+             [10, 4, 3],
+             [1, 6, 5],
+             [2, 6, 5],
+             [3, 6, 5],
+             [4, 6, 5],
+             [10, 6, 5],
+             [1, 8, 7],
+             [2, 8, 7],
+             [3, 8, 7],
+             [4, 8, 7],
+             [10, 8, 7]],
+            dtype=float
+        )
+        self.assertTrue(np.array_equal(execution_result, true_answer))
+
     def test_fit_transform_out_of_fold(self) -> type(None):
         """
         Test `fit_transform_out_of_fold` method on data

@@ -99,6 +99,18 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         func.__name__ = aggregator.__name__
         return func
 
+    @staticmethod
+    def __solve_issue_of_negative_indices(
+            source_positions: List[int],
+            X: np.ndarray
+            ) -> List[int]:
+        # Allow writing indices like `arr[-1]` instead of `arr[len(arr)]`.
+        source_positions = list(map(
+            lambda x: x + X.shape[1] if x < 0 else x,
+            source_positions
+        ))
+        return source_positions
+
     def fit(
             self,
             X: np.ndarray,
@@ -119,7 +131,10 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :return:
             fitted instance
         """
-        for position in source_positions:
+        for position in self.__solve_issue_of_negative_indices(
+                source_positions,
+                X
+                ):
             feature = X[:, position].reshape((-1, 1))
             target = y.reshape((-1, 1))
             df = pd.DataFrame(np.hstack((feature, target)), columns=['x', 'y'])
