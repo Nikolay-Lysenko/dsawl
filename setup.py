@@ -25,5 +25,5 @@ setup(
     license='MIT',
     keywords='machine_learning feature_engineering categorical_features',
     packages=find_packages(exclude=['docs', 'tests']),
-    install_requires=['numpy', 'scikit-learn', 'pandas']
+    install_requires=['numpy', 'pandas', 'scikit-learn']
 )
