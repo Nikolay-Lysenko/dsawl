@@ -559,8 +559,7 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
         """
         X, y = get_dataset_for_regression()
         rgr = OutOfFoldTargetEncodingRegressor(
-            LinearRegression(),
-            estimator_kwargs=dict()
+            LinearRegression()
         )
 
         # Fit it manually.
@@ -591,7 +590,6 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
         X, y = get_dataset_for_regression()
         rgr = OutOfFoldTargetEncodingRegressor(
             LinearRegression(),
-            estimator_kwargs=dict(),
             splitter=KFold()
         )
         result = rgr.fit_predict(X, y, source_positions=[1])
