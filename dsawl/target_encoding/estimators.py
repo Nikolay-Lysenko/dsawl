@@ -1,6 +1,8 @@
 """
-The module provides estimators that have compatible with `sklearn` API.
-These estimators are learnt with involvement of target-based
+The module provides estimators that have `sklearn`-like API.
+Main `sklearn` utilities like grid search cross-validation and
+pipelines are supported.
+The estimators are learnt with involvement of target-based
 out-of-fold generated features (which can replace some of
 initial features).
 Fitting is implemented in a way that leads to more realistic
@@ -53,7 +55,7 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
     def __init__(
             self,
             estimator: BaseEstimator,
-            estimator_kwargs: Dict,
+            estimator_kwargs: Optional[Dict] = None,
             splitter: Optional[Union[
                 KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
             ]] = None,
@@ -64,6 +66,8 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
             ):
         self._can_this_class_have_any_instances()
         self.estimator = estimator
+        if estimator_kwargs is None:
+            estimator_kwargs = dict()
         self.estimator.set_params(**estimator_kwargs)
         self.splitter = splitter
         self.aggregators = [np.mean] if aggregators is None else aggregators
