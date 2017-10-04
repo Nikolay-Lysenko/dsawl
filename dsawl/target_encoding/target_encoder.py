@@ -11,7 +11,7 @@ This trick is sometimes called target encoding.
 """
 
 
-from typing import List, Callable, Union, Optional
+from typing import List, Tuple, Callable, Union, Optional
 
 import numpy as np
 import pandas as pd
@@ -20,6 +20,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import (
     KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
 )
+from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 
 
 class TargetEncoder(BaseEstimator, TransformerMixin):
@@ -67,12 +68,11 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             min_frequency: Optional[int] = 1,
             drop_source_features: Optional[bool] = True
             ):
-        self.aggregators = [np.mean] if aggregators is None else aggregators
+        self.aggregators = aggregators
         self.splitter = splitter
         self.smoothing_strength = smoothing_strength
         self.min_frequency = min_frequency
         self.drop_source_features = drop_source_features
-        self.mappings_ = dict()
 
     def __process_raw_aggregator(
             self,
@@ -104,18 +104,35 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             source_positions: List[int],
             X: np.ndarray
             ) -> List[int]:
-        # Allow writing indices like `arr[-1]` instead of `arr[len(arr)]`.
+        # Allow writing indices like `arr[-1]` instead of `arr[len(arr) - 1]`.
         source_positions = list(map(
             lambda x: x + X.shape[1] if x < 0 else x,
             source_positions
         ))
         return source_positions
 
+    @staticmethod
+    def __coalesce(
+            aggregators: Optional[List[Callable]] = None,
+            source_positions: Optional[List[int]] = None,
+            splitter: Optional[Union[
+                KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
+            ]] = None,
+            n_splits: Optional[int] = 3
+            ) -> Tuple[List[Callable], List[int], Union[
+                       KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
+                       ]]:
+        # Fill missed values with corresponding defaults.
+        aggregators = aggregators or [np.mean]
+        source_positions = source_positions or [-1]
+        splitter = splitter or KFold(n_splits)
+        return aggregators, source_positions, splitter
+
     def fit(
             self,
             X: np.ndarray,
             y: np.ndarray,
-            source_positions: List[int]
+            source_positions: Optional[List[int]] = None
             ) -> 'TargetEncoder':
         """
         Fit to a whole dataset of `X` and `y`.
@@ -127,10 +144,20 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :param y:
             target
         :param source_positions:
-            indices of initial features to be used as conditions
+            indices of initial features to be used as conditions,
+            default is the last one column
         :return:
             fitted instance
         """
+        X, y = check_X_y(X, y)
+        # Below attribute is created only for the sake of full
+        # compatibility with `sklearn`.
+        self.n_columns_ = X.shape[1]
+        self.mappings_ = dict()
+        aggregators, source_positions, _ = self.__coalesce(
+            self.aggregators, source_positions
+        )
+
         for position in self.__solve_issue_of_negative_indices(
                 source_positions,
                 X
@@ -140,16 +167,16 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             df = pd.DataFrame(np.hstack((feature, target)), columns=['x', 'y'])
             mapping = df.groupby('x')['y'].agg(
                 [self.__process_raw_aggregator(agg, target)
-                 for agg in self.aggregators]
+                 for agg in aggregators]
             )
             mapping.reset_index(inplace=True)
             mapping.columns = (
                 [str(position)] +
-                ['agg_{}'.format(x) for x in range(len(self.aggregators))]
+                ['agg_{}'.format(x) for x in range(len(aggregators))]
             )
             # '__unseen__' is a reserved key for unseen values.
             mapping.loc['__unseen__'] = [np.nan] + [
-                agg(y) for agg in self.aggregators
+                agg(y) for agg in aggregators
             ]
             self.mappings_[position] = mapping
         return self
@@ -166,6 +193,13 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :return:
             transformed data
         """
+        check_is_fitted(self, ['mappings_', 'n_columns_'])
+        X = check_array(X)
+        if X.shape[1] != self.n_columns_:
+            raise ValueError(
+                'Shape of input is different from what was seen in `fit`.'
+            )
+
         transformed_df = pd.DataFrame(
             X,
             columns=[str(x) for x in range(X.shape[1])]
@@ -192,7 +226,7 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             self,
             X: np.ndarray,
             y: np.ndarray,
-            source_positions: List[int]
+            source_positions: Optional[List[int]] = None
             ) -> np.ndarray:
         """
         Enrich `X` with features based on `y` in a manner that
@@ -210,13 +244,16 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :return:
             transformed feature representation
         """
-        if self.splitter is None:
-            self.splitter = KFold(X.shape[0])
+        X, y = check_X_y(X, y)
+        aggregators, source_positions, splitter = self.__coalesce(
+            self.aggregators, source_positions, self.splitter, X.shape[0]
+        )
+
         new_n_columns = (X.shape[1] +
-                         len(self.aggregators) * len(source_positions) -
+                         len(aggregators) * len(source_positions) -
                          self.drop_source_features * len(source_positions))
         transformed_X = np.full((X.shape[0], new_n_columns), np.nan)
-        for fit_indices, transform_indices in self.splitter.split(X):
+        for fit_indices, transform_indices in splitter.split(X):
             self.fit(
                 X[fit_indices, :],
                 y[fit_indices],

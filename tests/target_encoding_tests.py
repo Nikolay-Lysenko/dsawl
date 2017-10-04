@@ -15,6 +15,7 @@ import pandas as pd
 
 from sklearn.model_selection import KFold, TimeSeriesSplit
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.utils.estimator_checks import check_estimator
 
 from dsawl.target_encoding.target_encoder import TargetEncoder
 from dsawl.target_encoding.estimators import (
@@ -57,6 +58,15 @@ class TestTargetEncoder(unittest.TestCase):
     """
     Tests of `TargetEncoder` class.
     """
+
+    def test_compatibility_with_sklearn(self) -> type(None):
+        """
+        Test that `sklearn` API is fully supported.
+
+        :return:
+            None
+        """
+        check_estimator(TargetEncoder)
 
     def test_fit_transform(self) -> type(None):
         """
@@ -531,6 +541,15 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
     Tests of `OutOfFoldTargetEncodingRegressor` class.
     """
 
+    def test_compatibility_with_sklearn(self) -> type(None):
+        """
+        Test that `sklearn` API is fully supported.
+
+        :return:
+            None
+        """
+        check_estimator(OutOfFoldTargetEncodingRegressor)
+
     def test_fit(self) -> type(None):
         """
         Test `fit` method.
@@ -563,8 +582,9 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
         )
 
         # Fit it manually.
-        rgr.estimator.coef_ = np.array([1.8, 0.8])
-        rgr.estimator.intercept_ = -2.8
+        rgr.estimator_ = LinearRegression()
+        rgr.estimator_.coef_ = np.array([1.8, 0.8])
+        rgr.estimator_.intercept_ = -2.8
         rgr.target_encoder_ = TargetEncoder()
         rgr.target_encoder_.mappings_ = {
             1: pd.DataFrame(
@@ -575,6 +595,7 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
                 index=[0, 1, '__unseen__']
             )
         }
+        rgr.target_encoder_.n_columns_ = 2
 
         result = rgr.predict(X)
         true_answer = np.array([5.8, 2.2, 4, 0.6, 2.4, 4.2])
@@ -623,6 +644,20 @@ class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
     Tests of `OutOfFoldTargetEncodingClassifier` class.
     """
 
+    def test_compatibility_with_sklearn(self) -> type(None):
+        """
+        Test that `sklearn` API is (almost) fully supported.
+
+        :return:
+            None
+        """
+        # FIXME: Now checks that go after the failed one are not run.
+        try:
+            check_estimator(OutOfFoldTargetEncodingClassifier)
+        except ValueError as e:
+            if 'only binary' in str(e):  # No multiclass option now.
+                pass
+
     def test_fit(self) -> type(None):
         """
         Test `fit` method.
@@ -656,8 +691,9 @@ class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
         )
 
         # Fit it manually.
-        clf.estimator.coef_ = np.array([[0.48251806, -0.16291334]])
-        clf.estimator.intercept_ = [-0.51943239]
+        clf.estimator_ = LogisticRegression(random_state=361)
+        clf.estimator_.coef_ = np.array([[0.48251806, -0.16291334]])
+        clf.estimator_.intercept_ = [-0.51943239]
         clf.target_encoder_ = TargetEncoder()
         clf.target_encoder_.mappings_ = {
             1: pd.DataFrame(
@@ -668,6 +704,7 @@ class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
                 index=[0, 1, '__unseen__']
             )
         }
+        clf.target_encoder_.n_columns_ = 2
 
         result = clf.predict_proba(X)[:, 1]
         true_answer = np.array([0.69413293, 0.46368326, 0.58346035,
