@@ -1,7 +1,6 @@
 """
-The module provides estimators that have `sklearn`-like API.
-Main `sklearn` utilities like grid search cross-validation and
-pipelines are supported.
+The module provides estimators that have compatible with
+`sklearn` API.
 The estimators are learnt with involvement of target-based
 out-of-fold generated features (which can replace some of
 initial features).
@@ -13,7 +12,7 @@ generation of features that are aggregates of target value.
 """
 
 
-from typing import List, Dict, Callable, Union, Any, Optional
+from typing import List, Dict, Tuple, Callable, Union, Any, Optional
 
 import numpy as np
 
@@ -21,6 +20,10 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.model_selection import (
     KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
 )
+from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+from sklearn.utils.multiclass import unique_labels
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.preprocessing import LabelEncoder
 
 from .target_encoder import TargetEncoder
 
@@ -54,7 +57,7 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
 
     def __init__(
             self,
-            estimator: BaseEstimator,
+            estimator: Optional[BaseEstimator] = None,
             estimator_kwargs: Optional[Dict] = None,
             splitter: Optional[Union[
                 KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
@@ -66,32 +69,45 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
             ):
         self._can_this_class_have_any_instances()
         self.estimator = estimator
-        if estimator_kwargs is None:
-            estimator_kwargs = dict()
-        self.estimator.set_params(**estimator_kwargs)
+        self.estimator_kwargs = estimator_kwargs
         self.splitter = splitter
-        self.aggregators = [np.mean] if aggregators is None else aggregators
+        self.aggregators = aggregators
         self.smoothing_strength = smoothing_strength
         self.min_frequency = min_frequency
         self.drop_source_features = drop_source_features
-        self.target_encoder_ = None
-        self.extended_X_ = None
+        self._extended_X = None
 
     @classmethod
     def _can_this_class_have_any_instances(cls):
         # Make this class abstract.
         raise TypeError('{} must not have any instances.'.format(cls))
 
+    def _set_internal_estimator(self):
+        # Instantiate estimator from initialization parameters.
+        pass
+
+    def _do_supplementary_preparations(
+            self,
+            X: np.ndarray,
+            y: np.ndarray
+            ) -> Tuple[np.ndarray, np.ndarray]:
+        # Transform `X` and `y` specially for regression or classification.
+        return X, y
+
     def _fit(
             self,
             X: np.ndarray,
             y: np.ndarray,
-            source_positions: List[int],
+            source_positions: Optional[List[int]] = None,
             fit_kwargs: Optional[Dict[Any, Any]] = None,
             save_training_features_as_attr: Optional[bool] = False
             ) -> 'BaseOutOfFoldTargetEncodingEstimator':
         # Run all internal logic of fitting.
 
+        X, y = check_X_y(X, y)
+        X_, y_ = self._do_supplementary_preparations(X, y)
+
+        self.estimator_ = self._set_internal_estimator()
         self.target_encoder_ = TargetEncoder(
             self.aggregators,
             self.splitter,
@@ -101,21 +117,21 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         )
         extended_X = self.target_encoder_.fit_transform_out_of_fold(
             X,
-            y,
+            y_,
             source_positions
         )
 
-        fit_kwargs = dict() if fit_kwargs is None else fit_kwargs
-        self.estimator.fit(extended_X, y, **fit_kwargs)
+        fit_kwargs = fit_kwargs or dict()
+        self.estimator_.fit(extended_X, y, **fit_kwargs)
         if save_training_features_as_attr:
-            self.extended_X_ = extended_X
+            self._extended_X = extended_X
         return self
 
     def fit(
             self,
             X: np.ndarray,
             y: np.ndarray,
-            source_positions: List[int],
+            source_positions: Optional[List[int]] = None,
             fit_kwargs: Optional[Dict[Any, Any]] = None
             ) -> 'BaseOutOfFoldTargetEncodingEstimator':
         """
@@ -158,17 +174,18 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         :return:
             predictions
         """
-        if self.target_encoder_ is None:
-            raise RuntimeError("Estimator must be trained before predicting")
+        check_is_fitted(self, ['target_encoder_'])
+        X = check_array(X)
+
         extended_X = self.target_encoder_.transform(X)
-        predictions = self.estimator.predict(extended_X)
+        predictions = self.estimator_.predict(extended_X)
         return predictions
 
     def fit_predict(
             self,
             X: np.ndarray,
             y: np.ndarray,
-            source_positions: List[int],
+            source_positions: Optional[List[int]] = None,
             fit_kwargs: Optional[Dict[Any, Any]] = None
             ) -> np.ndarray:
         """
@@ -188,10 +205,10 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         try:
             self._fit(X, y, source_positions, fit_kwargs,
                       save_training_features_as_attr=True)
-            predictions = self.estimator.predict(self.extended_X_)
+            predictions = self.estimator_.predict(self._extended_X)
             return predictions
         finally:
-            self.extended_X_ = None
+            self._extended_X = None
 
 
 class OutOfFoldTargetEncodingRegressor(
@@ -207,6 +224,12 @@ class OutOfFoldTargetEncodingRegressor(
         # Allow this class to have instances.
         pass
 
+    def _set_internal_estimator(self) -> BaseEstimator:
+        # Instantiate estimator from initialization parameters.
+        estimator = self.estimator or LinearRegression()
+        estimator_kwargs = self.estimator_kwargs or dict()
+        return estimator.set_params(**estimator_kwargs)
+
 
 class OutOfFoldTargetEncodingClassifier(
         BaseOutOfFoldTargetEncodingEstimator, ClassifierMixin
@@ -220,6 +243,26 @@ class OutOfFoldTargetEncodingClassifier(
     def _can_this_class_have_any_instances(cls):
         # Allow this class to have instances.
         pass
+
+    def _set_internal_estimator(self) -> BaseEstimator:
+        # Instantiate estimator from initialization parameters.
+        estimator = self.estimator or LogisticRegression()
+        estimator_kwargs = self.estimator_kwargs or dict()
+        return estimator.set_params(**estimator_kwargs)
+
+    def _do_supplementary_preparations(
+            self,
+            X: np.ndarray,
+            y: np.ndarray
+            ) -> Tuple[np.ndarray, np.ndarray]:
+        # Take into account nuances of classification.
+        self.classes_ = unique_labels(y)
+        if len(np.unique(y)) > 2:
+            raise ValueError(
+                "As of now, only binary classification is supported."
+            )
+        y_ = LabelEncoder().fit_transform(y)
+        return X, y_
 
     def predict_proba(
             self,
@@ -236,14 +279,14 @@ class OutOfFoldTargetEncodingClassifier(
         :return:
             predicted probabilities
         """
-        if not hasattr(self.estimator, "predict_proba"):
+        check_is_fitted(self, ['target_encoder_'])
+        if not hasattr(self.estimator_, "predict_proba"):
             raise NotImplementedError(
                 "Internal estimator has not predict_proba method"
             )
-        if self.target_encoder_ is None:
-            raise RuntimeError("Estimator must be trained before predicting")
+
         extended_X = self.target_encoder_.transform(X)
-        predicted_probabilities = self.estimator.predict_proba(extended_X)
+        predicted_probabilities = self.estimator_.predict_proba(extended_X)
         return predicted_probabilities
 
     def fit_predict_proba(
@@ -276,7 +319,7 @@ class OutOfFoldTargetEncodingClassifier(
             self._fit(X, y, source_positions, fit_kwargs,
                       save_training_features_as_attr=True)
             predicted_probabilities = \
-                self.estimator.predict_proba(self.extended_X_)
+                self.estimator_.predict_proba(self._extended_X)
             return predicted_probabilities
         finally:
-            self.extended_X_ = None
+            self._extended_X = None
