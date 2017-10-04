@@ -11,7 +11,7 @@ This trick is sometimes called target encoding.
 """
 
 
-from typing import List, Callable, Union, Optional
+from typing import List, Tuple, Callable, Union, Optional
 
 import numpy as np
 import pandas as pd
@@ -111,6 +111,23 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         ))
         return source_positions
 
+    @staticmethod
+    def __coalesce(
+            aggregators: Optional[List[Callable]] = None,
+            source_positions: Optional[List[int]] = None,
+            splitter: Optional[Union[
+                KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
+            ]] = None,
+            n_splits: Optional[int] = 3
+            ) -> Tuple[List[Callable], List[int], Union[
+                       KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
+                       ]]:
+        # Fill missed values with corresponding defaults.
+        aggregators = aggregators or [np.mean]
+        source_positions = source_positions or [-1]
+        splitter = splitter or KFold(n_splits)
+        return aggregators, source_positions, splitter
+
     def fit(
             self,
             X: np.ndarray,
@@ -137,9 +154,10 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         # compatibility with `sklearn`.
         self.n_columns_ = X.shape[1]
         self.mappings_ = dict()
+        aggregators, source_positions, _ = self.__coalesce(
+            self.aggregators, source_positions
+        )
 
-        aggregators = self.aggregators or [np.mean]
-        source_positions = source_positions or [-1]
         for position in self.__solve_issue_of_negative_indices(
                 source_positions,
                 X
@@ -227,15 +245,15 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             transformed feature representation
         """
         X, y = check_X_y(X, y)
-        self.splitter = self.splitter or KFold(X.shape[0])
-        aggregators = self.aggregators or [np.mean]
-        source_positions = source_positions or [-1]
+        aggregators, source_positions, splitter = self.__coalesce(
+            self.aggregators, source_positions, self.splitter, X.shape[0]
+        )
 
         new_n_columns = (X.shape[1] +
                          len(aggregators) * len(source_positions) -
                          self.drop_source_features * len(source_positions))
         transformed_X = np.full((X.shape[0], new_n_columns), np.nan)
-        for fit_indices, transform_indices in self.splitter.split(X):
+        for fit_indices, transform_indices in splitter.split(X):
             self.fit(
                 X[fit_indices, :],
                 y[fit_indices],
