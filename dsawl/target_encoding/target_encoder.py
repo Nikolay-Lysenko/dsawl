@@ -17,10 +17,14 @@ import numpy as np
 import pandas as pd
 
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.model_selection import (
     KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
 )
-from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+
+
+# For the sake of convenience, define a new type.
+FoldType = Union[KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit]
 
 
 class TargetEncoder(BaseEstimator, TransformerMixin):
@@ -43,27 +47,26 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
     new features based only on out-of-fold values of target.
 
     :param aggregators:
-        functions that compute aggregates
+        functions that compute aggregates, default is mean function
     :param splitter:
         object that splits data into folds for out-of-fold
         transformation, default schema is Leave-One-Out.
     :param smoothing_strength:
-        strength of smoothing towards unconditional aggregates
+        strength of smoothing towards unconditional aggregates,
+        by default there is no smoothing
     :param min_frequency:
         minimal number of occurrences of a feature's value (if value
         occurs less times than this parameter, this value is mapped to
-        unconditional aggregate)
+        unconditional aggregate), by default it is 1
     :param drop_source_features:
-        drop or keep those of initial features that are used for
-        conditioning over them
+        to drop or to keep those of initial features that are used for
+        conditioning over them, default is to drop
     """
 
     def __init__(
             self,
             aggregators: Optional[List[Callable]] = None,
-            splitter: Optional[Union[
-                KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
-            ]] = None,
+            splitter: Optional[FoldType] = None,
             smoothing_strength: Optional[float] = 0,
             min_frequency: Optional[int] = 1,
             drop_source_features: Optional[bool] = True
@@ -99,14 +102,13 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         func.__name__ = aggregator.__name__
         return func
 
-    @staticmethod
-    def __solve_issue_of_negative_indices(
-            source_positions: List[int],
-            X: np.ndarray
+    def __handle_negative_indices(
+            self,
+            source_positions: List[int]
             ) -> List[int]:
         # Allow writing indices like `arr[-1]` instead of `arr[len(arr) - 1]`.
         source_positions = list(map(
-            lambda x: x + X.shape[1] if x < 0 else x,
+            lambda x: x + self.n_columns_ if x < 0 else x,
             source_positions
         ))
         return source_positions
@@ -115,13 +117,9 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
     def __coalesce(
             aggregators: Optional[List[Callable]] = None,
             source_positions: Optional[List[int]] = None,
-            splitter: Optional[Union[
-                KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
-            ]] = None,
+            splitter: Optional[FoldType] = None,
             n_splits: Optional[int] = 3
-            ) -> Tuple[List[Callable], List[int], Union[
-                       KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
-                       ]]:
+            ) -> Tuple[List[Callable], List[int], FoldType]:
         # Fill missed values with corresponding defaults.
         aggregators = aggregators or [np.mean]
         source_positions = source_positions or [-1]
@@ -150,18 +148,15 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             fitted instance
         """
         X, y = check_X_y(X, y)
-        # Below attribute is created only for the sake of full
-        # compatibility with `sklearn`.
+        # `n_columns_` attribute is created predominantly for the
+        # sake of full compatibility with `sklearn`.
         self.n_columns_ = X.shape[1]
         self.mappings_ = dict()
         aggregators, source_positions, _ = self.__coalesce(
             self.aggregators, source_positions
         )
 
-        for position in self.__solve_issue_of_negative_indices(
-                source_positions,
-                X
-                ):
+        for position in self.__handle_negative_indices(source_positions):
             feature = X[:, position].reshape((-1, 1))
             target = y.reshape((-1, 1))
             df = pd.DataFrame(np.hstack((feature, target)), columns=['x', 'y'])
@@ -240,7 +235,8 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         :param y:
             target to be incorporated in new features
         :param source_positions:
-            indices of initial features to be used as conditions
+            indices of initial features to be used as conditions,
+            default is the last one
         :return:
             transformed feature representation
         """

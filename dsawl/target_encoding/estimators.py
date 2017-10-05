@@ -17,15 +17,12 @@ from typing import List, Dict, Tuple, Callable, Union, Any, Optional
 import numpy as np
 
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
-from sklearn.model_selection import (
-    KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
-)
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.preprocessing import LabelEncoder
 
-from .target_encoder import TargetEncoder
+from .target_encoder import TargetEncoder, FoldType
 
 
 class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
@@ -41,27 +38,26 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         object that splits data into folds, default schema is
         Leave-One-Out
     :param aggregators:
-        functions that compute aggregates
+        functions that compute aggregates, default is mean function
     :param smoothing_strength:
         strength of smoothing towards unconditional aggregates for
-        target-based features creation (aka target encoding)
+        target-based features creation (aka target encoding),
+        by default there is no smoothing
     :param min_frequency:
         minimal number of occurrences of a feature's value (if value
         occurs less times than this parameter, this value is mapped to
-        unconditional aggregate)
+        unconditional aggregate), by default it is 1
     :param drop_source_features:
-        drop or keep at training stage those of initial features
+        to drop or to keep at training stage those of initial features
         that are used for conditioning over them at new features'
-        generation stage
+        generation stage, default is to drop
     """
 
     def __init__(
             self,
             estimator: Optional[BaseEstimator] = None,
             estimator_kwargs: Optional[Dict] = None,
-            splitter: Optional[Union[
-                KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
-            ]] = None,
+            splitter: Optional[FoldType] = None,
             aggregators: Optional[List[Callable]] = None,
             smoothing_strength: Optional[float] = 0,
             min_frequency: Optional[int] = 1,
@@ -83,7 +79,7 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         raise TypeError('{} must not have any instances.'.format(cls))
 
     def _set_internal_estimator(self):
-        # Instantiate estimator from initialization parameters.
+        # Instantiate nested estimator from initialization parameters.
         pass
 
     def _do_supplementary_preparations(
@@ -146,7 +142,8 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         :param y:
             target
         :param source_positions:
-            indices of initial features to be used as conditions
+            indices of initial features to be used as conditions,
+            default is the last one
         :param fit_kwargs:
             settings of internal estimator fit
         :return:
@@ -196,7 +193,8 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         :param y:
             target
         :param source_positions:
-            indices of initial features to be used as conditions
+            indices of initial features to be used as conditions,
+            default is the last one
         :param fit_kwargs:
             settings of internal estimator fit
         :return:
@@ -282,7 +280,7 @@ class OutOfFoldTargetEncodingClassifier(
         check_is_fitted(self, ['target_encoder_'])
         if not hasattr(self.estimator_, "predict_proba"):
             raise NotImplementedError(
-                "Internal estimator has not predict_proba method"
+                "Internal estimator has not `predict_proba` method."
             )
 
         extended_X = self.target_encoder_.transform(X)
@@ -305,7 +303,8 @@ class OutOfFoldTargetEncodingClassifier(
         :param y:
             target
         :param source_positions:
-            indices of initial features to be used as conditions
+            indices of initial features to be used as conditions,
+            default is the last one
         :param fit_kwargs:
             settings of internal estimator fit
         :return:
@@ -313,7 +312,7 @@ class OutOfFoldTargetEncodingClassifier(
         """
         if not hasattr(self.estimator, "predict_proba"):
             raise NotImplementedError(
-                "Internal estimator has not predict_proba method"
+                "Internal estimator has not `predict_proba` method."
             )
         try:
             self._fit(X, y, source_positions, fit_kwargs,
