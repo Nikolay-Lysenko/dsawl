@@ -6,13 +6,13 @@
 
 ## What is it?
 This is a set of tools for machine learning. As of now, the list of implemented utilities is as follows:
-* Target encoding, an alternative to one-hot encoding and hashing trick that attempts to have both memory efficiency and incorporation of all useful information from initial features. See `docs/target_encoding_demo.ipynb` for more details.
+* Target encoding, an alternative to one-hot encoding and hashing trick that attempts to have both memory efficiency and incorporation of all useful information from initial features. More details can be found in [a tutorial](https://github.com/Nikolay-Lysenko/dsawl/blob/master/docs/target_encoding_demo.ipynb).
 
 Repository name is a combination of three words: DS, saw, and awl. DS is as an abbreviation for Data Science and the latter two words represent useful tools.
 
 
 ## How to install the package?
-The package is compatible with Python 3.5 or newer. Other requirements are installed by `conda` if you follow below instructions.
+The package is compatible with Python 3.5 or newer. Other requirements are installed by `pip` if you follow below instructions.
 
 If you are using Linux, execute this from your terminal:
 ```
@@ -20,11 +20,12 @@ cd path/to/your/destination
 git clone https://github.com/Nikolay-Lysenko/dsawl
 cd dsawl
 source activate your_conda_env
-conda install --file package-list.txt
 pip install .
 ```
 
 Instructions for other operating systems will be released in the future (probably, above commands are valid not only on Linux).
+
+If you have any troubles with installation, your questions are welcome. A virtual environment where it is guaranteed that the package works can be created based on [the file](https://github.com/Nikolay-Lysenko/dsawl/blob/master/package-list.txt) named `package-list.txt` from the repository of the project.
 
 After successful installation, you can use this package like any other regular package from your currently activated virtual environment. For example, you can import a class from it:
 ```
