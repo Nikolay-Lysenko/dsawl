@@ -19,7 +19,7 @@ If you are using Linux, execute this from your terminal:
 cd path/to/your/destination
 git clone https://github.com/Nikolay-Lysenko/dsawl
 cd dsawl
-source activate your_conda_env
+source activate your_virtual_env
 pip install .
 ```
 

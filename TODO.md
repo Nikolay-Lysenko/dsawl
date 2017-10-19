@@ -1,1 +1,1 @@
-* Implement a class with on-the-fly model selection.
+* Run all `sklearn` compatibility checks for `OutOfFoldTargetEncodingClassifier`.

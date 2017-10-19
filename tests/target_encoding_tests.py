@@ -79,9 +79,7 @@ class TestTargetEncoder(unittest.TestCase):
         X, y = get_dataset_for_features_creation()
         target_encoder = TargetEncoder(aggregators=[np.mean, np.median])
         execution_result = target_encoder.fit_transform(
-            X,
-            y,
-            source_positions=[1]
+            X, y, source_positions=[1]
         )
         true_answer = np.array(
             [[1, 4, 3],
@@ -114,9 +112,7 @@ class TestTargetEncoder(unittest.TestCase):
         X, y = get_dataset_for_features_creation()
         target_encoder = TargetEncoder(aggregators=[np.mean, np.median])
         execution_result = target_encoder.fit_transform(
-            X,
-            y,
-            source_positions=[0, 1]
+            X, y, source_positions=[0, 1]
         )
         true_answer = np.array(
             [[3, 3, 4, 3],
@@ -153,9 +149,7 @@ class TestTargetEncoder(unittest.TestCase):
             drop_source_features=False
         )
         execution_result = target_encoder.fit_transform(
-            X,
-            y,
-            source_positions=[1]
+            X, y, source_positions=[1]
         )
         true_answer = np.array(
             [[1, 0, 4],
@@ -191,9 +185,7 @@ class TestTargetEncoder(unittest.TestCase):
             smoothing_strength=5
         )
         execution_result = target_encoder.fit_transform(
-            X,
-            y,
-            source_positions=[1]
+            X, y, source_positions=[1]
         )
         true_answer = np.array(
             [[1, 5, 4],
@@ -231,9 +223,7 @@ class TestTargetEncoder(unittest.TestCase):
             min_frequency=5
         )
         execution_result = target_encoder.fit_transform(
-            X,
-            y,
-            source_positions=[1]
+            X, y, source_positions=[1]
         )
         true_answer = np.array(
             [[1, 4, 3],
@@ -266,9 +256,7 @@ class TestTargetEncoder(unittest.TestCase):
         X, y = get_dataset_for_features_creation()
         target_encoder = TargetEncoder(aggregators=[np.mean, np.median])
         execution_result = target_encoder.fit_transform(
-            X,
-            y,
-            source_positions=[-1]
+            X, y, source_positions=[-1]
         )
         true_answer = np.array(
             [[1, 4, 3],
@@ -304,9 +292,7 @@ class TestTargetEncoder(unittest.TestCase):
             splitter=KFold(n_splits=5)
         )
         execution_result = target_encoder.fit_transform_out_of_fold(
-            X,
-            y,
-            source_positions=[1]
+            X, y, source_positions=[1]
         )
         true_answer = np.array(
             [[1, 7, 7],
@@ -342,9 +328,7 @@ class TestTargetEncoder(unittest.TestCase):
             splitter=KFold(n_splits=5)
         )
         execution_result = target_encoder.fit_transform_out_of_fold(
-            X,
-            y,
-            source_positions=[0, 1]
+            X, y, source_positions=[0, 1]
         )
         true_answer = np.array(
             [[4, 4, 7, 7],
@@ -380,9 +364,7 @@ class TestTargetEncoder(unittest.TestCase):
             aggregators=[np.mean, np.median]
         )
         execution_result = target_encoder.fit_transform_out_of_fold(
-            X,
-            y,
-            source_positions=[1]
+            X, y, source_positions=[1]
         )
         true_answer = np.array(
             [[1, 4.75, 3.5],
@@ -423,9 +405,7 @@ class TestTargetEncoder(unittest.TestCase):
             drop_source_features=False
         )
         execution_result = target_encoder.fit_transform_out_of_fold(
-            X,
-            y,
-            source_positions=[1]
+            X, y, source_positions=[1]
         )
         true_answer = np.array(
             [[1, 2, 7, 6],
@@ -462,9 +442,7 @@ class TestTargetEncoder(unittest.TestCase):
             splitter=TimeSeriesSplit(n_splits=5)
         )
         execution_result = target_encoder.fit_transform_out_of_fold(
-            X,
-            y,
-            source_positions=[1]
+            X, y, source_positions=[1]
         )
         true_answer = np.array(
             [[1, 4, 3],
@@ -502,9 +480,7 @@ class TestTargetEncoder(unittest.TestCase):
             aggregators=[np.mean, np.median]
         )
         execution_result = target_encoder.fit_transform_out_of_fold(
-            X,
-            y,
-            source_positions=[1]
+            X, y, source_positions=[1]
         )
         true_answer = np.array(
             [[4, 5, 5],
