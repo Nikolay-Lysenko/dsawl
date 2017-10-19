@@ -67,9 +67,9 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             self,
             aggregators: Optional[List[Callable]] = None,
             splitter: Optional[FoldType] = None,
-            smoothing_strength: Optional[float] = 0,
-            min_frequency: Optional[int] = 1,
-            drop_source_features: Optional[bool] = True
+            smoothing_strength: float = 0,
+            min_frequency: int = 1,
+            drop_source_features: bool = True
             ):
         self.aggregators = aggregators
         self.splitter = splitter
@@ -118,7 +118,7 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             aggregators: Optional[List[Callable]] = None,
             source_positions: Optional[List[int]] = None,
             splitter: Optional[FoldType] = None,
-            n_splits: Optional[int] = 3
+            n_splits: int = 3
             ) -> Tuple[List[Callable], List[int], FoldType]:
         # Fill missed values with corresponding defaults.
         aggregators = aggregators or [np.mean]
@@ -196,8 +196,7 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             )
 
         transformed_df = pd.DataFrame(
-            X,
-            columns=[str(x) for x in range(X.shape[1])]
+            X, columns=[str(x) for x in range(X.shape[1])]
         )
         for position, mapping in self.mappings_.items():
             transformed_df = transformed_df.merge(
@@ -210,10 +209,11 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             ] = default_values
         transformed_X = transformed_df.values
         if self.drop_source_features:
-            relevant_columns = list(filter(
-                lambda x: x not in self.mappings_.keys(),
-                range(transformed_X.shape[1])
-            ))
+            relevant_columns = [
+                x
+                for x in range(transformed_X.shape[1])
+                if x not in self.mappings_.keys()
+            ]
             transformed_X = transformed_X[:, relevant_columns]
         return transformed_X
 
