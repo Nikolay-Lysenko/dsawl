@@ -126,6 +126,15 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         splitter = splitter or KFold(n_splits)
         return aggregators, source_positions, splitter
 
+    def __drop_source_features(self, transformed_X: np.array) -> np.array:
+        # Remove from `X` features that has been used for conditioning.
+        relevant_columns = [
+            x
+            for x in range(transformed_X.shape[1])
+            if x not in self.mappings_.keys()
+        ]
+        return transformed_X[:, relevant_columns]
+
     def fit(
             self,
             X: np.ndarray,
@@ -209,12 +218,7 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
             ] = default_values
         transformed_X = transformed_df.values
         if self.drop_source_features:
-            relevant_columns = [
-                x
-                for x in range(transformed_X.shape[1])
-                if x not in self.mappings_.keys()
-            ]
-            transformed_X = transformed_X[:, relevant_columns]
+            transformed_X = self.__drop_source_features(transformed_X)
         return transformed_X
 
     def fit_transform_out_of_fold(
