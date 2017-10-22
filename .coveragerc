@@ -11,5 +11,6 @@ exclude_lines =
     raise NotImplementedError
     raise RuntimeError
     raise TypeError
+    raise ValueError
     if __name__ == .__main__.:
     pass
