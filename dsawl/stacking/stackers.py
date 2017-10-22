@@ -65,7 +65,7 @@ class BaseStacking(BaseEstimator):
 
     def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
-        pass
+        raise NotImplementedError
 
     def _create_base_estimators_from_their_types(
             self,
@@ -102,7 +102,7 @@ class BaseStacking(BaseEstimator):
 
     def _create_meta_estimator(self) -> BaseEstimator:
         # Instantiate second stage estimator from initialization parameters.
-        pass
+        raise NotImplementedError
 
     def _create_meta_estimator_by_its_type(
             self,
@@ -127,77 +127,39 @@ class BaseStacking(BaseEstimator):
         return splitter
 
     @staticmethod
-    def __infer_operation(fitted_estimator: Any) -> Callable:
+    def _infer_operation(fitted_estimator: Any) -> Callable:
         # Figure out what `fitted_estimator` must do according to its type.
-
-        def predict(
-                estimator: Any,
-                X: np.array,
-                *args, **kwargs
-                ) -> np.ndarray:
-            return estimator.predict(X).reshape((-1, 1))
-
-        def predict_proba(
-                estimator: Any,
-                X: np.array,
-                *args, **kwargs
-                ) -> np.ndarray:
-
-            def predict_proba_for_all_classes(
-                    estimator: Any,
-                    X: np.array,
-                    train_labels: Union[List[int], range],
-                    n_all_labels: int
-                    ) -> np.array:
-                # Take into consideration that some classes may be not
-                # represented on training folds.
-                if isinstance(train_labels, range):
-                    train_labels = list(train_labels)
-                train_labels = [int(x) for x in train_labels]
-                preds = np.zeros((X.shape[0], n_all_labels))
-                preds[:, train_labels] = estimator.predict_proba(X)
-                # Last column is dropped, because probabilities sum up to 1.
-                preds = preds[:, :-1]
-                return preds
-
-            return predict_proba_for_all_classes(estimator, X, *args, **kwargs)
-
-        def transform(
-                estimator: Any,
-                X: np.array,
-                *args, **kwargs
-                ) -> np.ndarray:
-            result = estimator.transform(X)
-            result = (
-                result if len(result.shape) > 1 else result.reshape((-1, 1))
-            )
-            return result
-
-        if isinstance(fitted_estimator, ClassifierMixin):
-            if hasattr(fitted_estimator, 'predict_proba'):
-                return predict_proba
-            else:
-                return predict
-        elif isinstance(fitted_estimator, RegressorMixin):
-            return predict
-        elif isinstance(fitted_estimator, TransformerMixin):
-            return transform
-        else:
-            raise ValueError(
-                'Invalid type of estimator: {}'.format(type(fitted_estimator))
-            )
+        raise NotImplementedError
 
     @staticmethod
     def __restore_initial_order(
-            meta_features: np.array,
-            folds: List[Tuple[np.array]]
-            ) -> np.array:
+            meta_features: np.ndarray,
+            folds: List[Tuple[np.ndarray]]
+            ) -> np.ndarray:
         # Rearrange data for the second stage model and get order of rows
         # that corresponds to initial order of objects.
         ordering_column = np.hstack([x[1] for x in folds]).reshape((-1, 1))
         meta_features = np.hstack((meta_features, ordering_column))
         meta_features = meta_features[meta_features[:, -1].argsort(), :-1]
         return meta_features
+
+    def _preprocess_target_variable(self, y: np.ndarray) -> np.ndarray:
+        # Run operations that are specific to regression or classification.
+        self.classes_ = []  # An arbitrary list.
+        return y
+
+    def _apply_fitted_base_estimator(
+            self,
+            apply_fn: Callable,
+            estimator: Any,
+            X: np.ndarray,
+            labels_from_training_folds: Optional[List[int]] = None
+            ) -> np.ndarray:
+        # Use `estimator` on `X` with `apply_fn`.
+        # It is a version for `StackingRegressor`.
+        # This method is overridden in `StackingClassifier`.
+        result = apply_fn(estimator, X)
+        return result
 
     def _fit(
             self,
@@ -209,8 +171,7 @@ class BaseStacking(BaseEstimator):
         # Implement internal logic of fitting.
 
         X, y = check_X_y(X, y)
-        if self.is_classifier:
-            self.classes_, y = np.unique(y, return_inverse=True)
+        y = self._preprocess_target_variable(y)
 
         base_estimators = self._create_base_estimators()
         splitter = self._create_splitter()
@@ -221,7 +182,7 @@ class BaseStacking(BaseEstimator):
         folds = list(splitter.split(X))
         meta_features = []
         for estimator in base_estimators:
-            apply_fn = self.__infer_operation(estimator)
+            apply_fn = self._infer_operation(estimator)
             current_meta_feature = []
             for fit_indices, hold_out_indices in folds:
                 estimator.fit(
@@ -229,11 +190,11 @@ class BaseStacking(BaseEstimator):
                     y[fit_indices],
                     **fit_kwargs.get(estimator, dict())
                 )
-                current_meta_feature_on_fold = apply_fn(
-                    estimator,
-                    X[hold_out_indices, :],
-                    sorted(np.unique(y[fit_indices]).tolist()),
-                    len(self.classes_) if self.is_classifier else 0
+                current_meta_feature_on_fold = (
+                    self._apply_fitted_base_estimator(
+                        apply_fn, estimator, X[hold_out_indices, :],
+                        sorted(np.unique(y[fit_indices]).tolist())
+                    )
                 )
                 current_meta_feature.append(current_meta_feature_on_fold)
             current_meta_x = np.vstack(current_meta_feature)
@@ -265,11 +226,22 @@ class BaseStacking(BaseEstimator):
         """
         return self._fit(X, y, fit_kwargs, meta_fit_kwargs)
 
+    def _predict_on_the_second_stage(
+            self,
+            meta_X: np.ndarray,
+            return_probabilities: Optional[bool] = False
+            ) -> np.ndarray:
+        # Make predictions with meta-estimator.
+        # It is a version for `StackingRegressor`.
+        # This method is overridden in `StackingClassifier`.
+        predictions = self.meta_estimator_.predict(meta_X)
+        return predictions
+
     def _predict(
             self,
-            X: np.array,
-            return_probabilities: bool
-            ) -> np.array:
+            X: np.ndarray,
+            return_probabilities: Optional[bool] = False
+            ) -> np.ndarray:
         # Implement internal logic of predicting.
 
         check_is_fitted(self, ['base_estimators_', 'meta_estimator_'])
@@ -277,26 +249,22 @@ class BaseStacking(BaseEstimator):
 
         meta_features = []
         for estimator in self.base_estimators_:
-            apply_fn = self.__infer_operation(estimator)
-            if self.is_classifier:
-                current_meta_feature = apply_fn(
-                    estimator, X, range(len(self.classes_)), len(self.classes_)
-                )
-            else:
-                current_meta_feature = apply_fn(estimator, X, 0, 0)
+            apply_fn = self._infer_operation(estimator)
+            current_meta_feature = self._apply_fitted_base_estimator(
+                apply_fn, estimator, X, list(range(len(self.classes_)))
+            )
             meta_features.append(current_meta_feature)
         meta_X = np.hstack(meta_features)
 
-        if return_probabilities:
-            predictions = self.meta_estimator_.predict_proba(meta_X)
-        else:
-            predictions = self.meta_estimator_.predict(meta_X)
+        predictions = self._predict_on_the_second_stage(
+            meta_X, return_probabilities
+        )
         return predictions
 
     def predict(
             self,
-            X: np.array,
-            ) -> np.array:
+            X: np.ndarray,
+            ) -> np.ndarray:
         """
 
         :param X:
@@ -317,28 +285,6 @@ class StackingRegressor(BaseStacking, RegressorMixin):
     """
 
     """
-
-    def __init__(
-            self,
-            base_estimators_types: Optional[List[type]] = None,
-            base_estimators_params: Optional[List[Dict[str, Any]]] = None,
-            meta_estimator_type: Optional[Any] = None,
-            meta_estimator_params: Optional[Dict[str, Any]] = None,
-            splitter: Optional[FoldType] = None,
-            keep_meta_X: bool = True,
-            random_state: Optional[int] = None
-            ):
-        self.is_classifier = False
-        # Style of `sklearn` prohibits usage of `*args` and `**kwargs`.
-        super().__init__(
-            base_estimators_types,
-            base_estimators_params,
-            meta_estimator_type,
-            meta_estimator_params,
-            splitter,
-            keep_meta_X,
-            random_state
-        )
 
     @classmethod
     def _can_this_class_have_any_instances(cls):
@@ -362,33 +308,34 @@ class StackingRegressor(BaseStacking, RegressorMixin):
         )
         return meta_estimator
 
+    @staticmethod
+    def _infer_operation(fitted_estimator: Any) -> Callable:
+        # Figure out what `fitted_estimator` must do according to its type.
+
+        def predict(estimator: Any, X: np.ndarray) -> np.ndarray:
+            return estimator.predict(X).reshape((-1, 1))
+
+        def transform(estimator: Any, X: np.ndarray) -> np.ndarray:
+            result = estimator.transform(X)
+            result = (
+                result if len(result.shape) > 1 else result.reshape((-1, 1))
+            )
+            return result
+
+        if isinstance(fitted_estimator, RegressorMixin):
+            return predict
+        elif isinstance(fitted_estimator, TransformerMixin):
+            return transform
+        else:
+            raise ValueError(
+                'Invalid type of estimator: {}'.format(type(fitted_estimator))
+            )
+
 
 class StackingClassifier(BaseStacking, ClassifierMixin):
     """
 
     """
-
-    def __init__(
-            self,
-            base_estimators_types: Optional[List[type]] = None,
-            base_estimators_params: Optional[List[Dict[str, Any]]] = None,
-            meta_estimator_type: Optional[Any] = None,
-            meta_estimator_params: Optional[Dict[str, Any]] = None,
-            splitter: Optional[FoldType] = None,
-            keep_meta_X: bool = True,
-            random_state: Optional[int] = None
-            ):
-        self.is_classifier = True
-        # Style of `sklearn` prohibits usage of `*args` and `**kwargs`.
-        super().__init__(
-            base_estimators_types,
-            base_estimators_params,
-            meta_estimator_type,
-            meta_estimator_params,
-            splitter,
-            keep_meta_X,
-            random_state
-        )
 
     @classmethod
     def _can_this_class_have_any_instances(cls):
@@ -412,10 +359,105 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
         )
         return meta_estimator
 
+    @staticmethod
+    def _infer_operation(fitted_estimator: Any) -> Callable:
+        # Figure out what `fitted_estimator` must do according to its type.
+
+        def predict(
+                estimator: Any,
+                X: np.ndarray,
+                *args, **kwargs
+                ) -> np.ndarray:
+            return estimator.predict(X).reshape((-1, 1))
+
+        def predict_proba(
+                estimator: Any,
+                X: np.ndarray,
+                *args, **kwargs
+                ) -> np.ndarray:
+
+            def predict_proba_for_all_classes(
+                    estimator: Any,
+                    X: np.ndarray,
+                    train_labels: List[int],
+                    n_all_labels: int
+                    ) -> np.ndarray:
+                # Take into consideration that some classes may be not
+                # represented on training folds.
+                preds = np.zeros((X.shape[0], n_all_labels))
+                preds[:, train_labels] = estimator.predict_proba(X)
+                # Last column is dropped, because probabilities sum up to 1.
+                preds = preds[:, :-1]
+                return preds
+
+            return predict_proba_for_all_classes(estimator, X, *args, **kwargs)
+
+        def transform(
+                estimator: Any,
+                X: np.ndarray,
+                *args, **kwargs
+                ) -> np.ndarray:
+            result = estimator.transform(X)
+            result = (
+                result if len(result.shape) > 1 else result.reshape((-1, 1))
+            )
+            return result
+
+        if isinstance(fitted_estimator, ClassifierMixin):
+            if hasattr(fitted_estimator, 'predict_proba'):
+                return predict_proba
+            else:
+                return predict
+        elif isinstance(fitted_estimator, TransformerMixin):
+            return transform
+        else:
+            raise ValueError(
+                'Invalid type of estimator: {}'.format(type(fitted_estimator))
+            )
+
+    def _preprocess_target_variable(self, y: np.ndarray) -> np.ndarray:
+        # Convert class labels to dense integers.
+        # TODO: Can `sklearn.utils.multiclass` help?
+        self.classes_, y = np.unique(y, return_inverse=True)
+        return y
+
+    def _apply_fitted_base_estimator(
+            self,
+            apply_fn: Callable,
+            estimator: Any,
+            X: np.ndarray,
+            labels_from_training_folds: Optional[List[int]] = None
+            ) -> np.ndarray:
+        # Use `estimator` on `X` with `apply_fn`.
+        result = apply_fn(
+            estimator,
+            X,
+            labels_from_training_folds,
+            len(self.classes_)
+        )
+        return result
+
+    def _predict_on_the_second_stage(
+            self,
+            meta_X: np.ndarray,
+            return_probabilities: Optional[bool] = False
+            ) -> np.ndarray:
+        # Make predictions with meta-estimator.
+        if return_probabilities:
+            predictions = self.meta_estimator_.predict_proba(meta_X)
+        else:
+            raw_predictions = self.meta_estimator_.predict(meta_X)
+            predictions = np.apply_along_axis(
+                lambda x: self.classes_[x],
+                axis=0,
+                arr=raw_predictions
+            )
+        return predictions
+
     def predict_proba(
             self,
-            X: np.array
-            ) -> np.array:
+            X: np.ndarray
+            ) -> np.ndarray:
         """
 
         :param X:

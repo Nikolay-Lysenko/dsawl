@@ -173,6 +173,7 @@ class TestStackingRegressor(unittest.TestCase):
         meta_estimator.coef_ = np.array([1.01168028, -0.04313311])
         meta_estimator.intercept_ = 0.392229628617
         rgr.meta_estimator_ = meta_estimator
+        rgr.classes_ = []
 
         result = rgr.predict(X_test)
         true_answer = np.array(
