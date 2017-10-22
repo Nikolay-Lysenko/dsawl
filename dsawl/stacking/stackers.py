@@ -42,7 +42,7 @@ class BaseStacking(BaseEstimator):
             self,
             base_estimators_types: Optional[List[type]] = None,
             base_estimators_params: Optional[List[Dict[str, Any]]] = None,
-            meta_estimator_type: Optional[Any] = None,
+            meta_estimator_type: Optional[BaseEstimator] = None,
             meta_estimator_params: Optional[Dict[str, Any]] = None,
             splitter: Optional[FoldType] = None,
             keep_meta_X: bool = True,
@@ -128,7 +128,7 @@ class BaseStacking(BaseEstimator):
         return splitter
 
     @staticmethod
-    def _infer_operation(fitted_estimator: Any) -> Callable:
+    def _infer_operation(fitted_estimator: BaseEstimator) -> Callable:
         # Figure out what `fitted_estimator` must do according to its type.
         raise NotImplementedError
 
@@ -146,13 +146,12 @@ class BaseStacking(BaseEstimator):
 
     def _preprocess_target_variable(self, y: np.ndarray) -> np.ndarray:
         # Run operations that are specific to regression or classification.
-        self.classes_ = []  # An arbitrary list.
         return y
 
     def _apply_fitted_base_estimator(
             self,
             apply_fn: Callable,
-            estimator: Any,
+            estimator: BaseEstimator,
             X: np.ndarray,
             labels_from_training_folds: Optional[List[int]] = None
             ) -> np.ndarray:
@@ -166,7 +165,7 @@ class BaseStacking(BaseEstimator):
             self,
             X: np.ndarray,
             y: np.ndarray,
-            fit_kwargs: Optional[Dict[Any, Dict[str, Any]]] = None,
+            fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
             meta_fit_kwargs: Optional[Dict[str, Any]] = None,
             ) -> 'BaseStacking':
         # Implement internal logic of fitting.
@@ -189,6 +188,7 @@ class BaseStacking(BaseEstimator):
                 estimator.fit(
                     X[fit_indices, :],
                     y[fit_indices],
+                    # TODO: What if there are two estimators of the same type?
                     **fit_kwargs.get(estimator, dict())
                 )
                 current_meta_feature_on_fold = (
@@ -220,7 +220,7 @@ class BaseStacking(BaseEstimator):
             self,
             X: np.ndarray,
             y: np.ndarray,
-            fit_kwargs: Optional[Dict[Any, Dict[str, Any]]] = None,
+            fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
             meta_fit_kwargs: Optional[Dict[str, Any]] = None
             ) -> 'BaseStacking':
         """
@@ -252,7 +252,10 @@ class BaseStacking(BaseEstimator):
         for estimator in self.base_estimators_:
             apply_fn = self._infer_operation(estimator)
             current_meta_feature = self._apply_fitted_base_estimator(
-                apply_fn, estimator, X, list(range(len(self.classes_)))
+                apply_fn, estimator, X,
+                list(range(len(self.classes_)))
+                if hasattr(self, 'classes_')
+                else []
             )
             meta_features.append(current_meta_feature)
         meta_X = np.hstack(meta_features)
@@ -310,13 +313,13 @@ class StackingRegressor(BaseStacking, RegressorMixin):
         return meta_estimator
 
     @staticmethod
-    def _infer_operation(fitted_estimator: Any) -> Callable:
+    def _infer_operation(fitted_estimator: BaseEstimator) -> Callable:
         # Figure out what `fitted_estimator` must do according to its type.
 
-        def predict(estimator: Any, X: np.ndarray) -> np.ndarray:
+        def predict(estimator: BaseEstimator, X: np.ndarray) -> np.ndarray:
             return estimator.predict(X).reshape((-1, 1))
 
-        def transform(estimator: Any, X: np.ndarray) -> np.ndarray:
+        def transform(estimator: BaseEstimator, X: np.ndarray) -> np.ndarray:
             result = estimator.transform(X)
             result = (
                 result if len(result.shape) > 1 else result.reshape((-1, 1))
@@ -361,24 +364,24 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
         return meta_estimator
 
     @staticmethod
-    def _infer_operation(fitted_estimator: Any) -> Callable:
+    def _infer_operation(fitted_estimator: BaseEstimator) -> Callable:
         # Figure out what `fitted_estimator` must do according to its type.
 
         def predict(
-                estimator: Any,
+                estimator: BaseEstimator,
                 X: np.ndarray,
                 *args, **kwargs
                 ) -> np.ndarray:
             return estimator.predict(X).reshape((-1, 1))
 
         def predict_proba(
-                estimator: Any,
+                estimator: BaseEstimator,
                 X: np.ndarray,
                 *args, **kwargs
                 ) -> np.ndarray:
 
             def predict_proba_for_all_classes(
-                    estimator: Any,
+                    estimator: BaseEstimator,
                     X: np.ndarray,
                     train_labels: List[int],
                     n_all_labels: int
@@ -394,7 +397,7 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
             return predict_proba_for_all_classes(estimator, X, *args, **kwargs)
 
         def transform(
-                estimator: Any,
+                estimator: BaseEstimator,
                 X: np.ndarray,
                 *args, **kwargs
                 ) -> np.ndarray:
@@ -425,7 +428,7 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
     def _apply_fitted_base_estimator(
             self,
             apply_fn: Callable,
-            estimator: Any,
+            estimator: BaseEstimator,
             X: np.ndarray,
             labels_from_training_folds: Optional[List[int]] = None
             ) -> np.ndarray:

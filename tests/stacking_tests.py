@@ -17,7 +17,29 @@ from sklearn.utils.estimator_checks import check_estimator
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 
-from dsawl.stacking.stackers import StackingRegressor, StackingClassifier
+from dsawl.stacking.stackers import (
+    BaseStacking, StackingRegressor, StackingClassifier
+)
+
+
+class TestBaseStacking(unittest.TestCase):
+    """
+    Tests of `BaseStacking` class.
+    """
+
+    def test_that_this_class_is_abstract(self) -> type(None):
+        """
+        Test that `BaseStacking` class can not have any instances.
+
+        :return:
+            None
+        """
+        message = ''
+        try:
+            BaseStacking()
+        except NotImplementedError as e:
+            message = str(e)
+        self.assertTrue('must not have any instances' in message)
 
 
 def get_dataset_for_regression() -> Tuple[np.ndarray, np.ndarray]:
@@ -173,7 +195,6 @@ class TestStackingRegressor(unittest.TestCase):
         meta_estimator.coef_ = np.array([1.01168028, -0.04313311])
         meta_estimator.intercept_ = 0.392229628617
         rgr.meta_estimator_ = meta_estimator
-        rgr.classes_ = []
 
         result = rgr.predict(X_test)
         true_answer = np.array(
@@ -201,6 +222,7 @@ def main():
     test_loader = unittest.TestLoader()
     suites_list = []
     testers = [
+        TestBaseStacking(),
         TestStackingRegressor(),
         TestStackingClassifier()
     ]

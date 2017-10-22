@@ -1,2 +1,3 @@
-* `OutOfFoldTargetEncoding[*]` must be a child of `Stacking[*]` where `super` is called with `TargetEncoder` as base estimator.
+* Parallel `fit` of stackings.
+* Support multi-class classification in `TargetEncoder`.
 * Run all `sklearn` compatibility checks for `OutOfFoldTargetEncodingClassifier`.
