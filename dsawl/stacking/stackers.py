@@ -59,7 +59,9 @@ class BaseStacking(BaseEstimator):
     @classmethod
     def _can_this_class_have_any_instances(cls):
         # Make this class abstract.
-        raise TypeError('{} must not have any instances.'.format(cls))
+        raise NotImplementedError(
+            '{} must not have any instances.'.format(cls)
+        )
 
     def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
@@ -128,15 +130,44 @@ class BaseStacking(BaseEstimator):
     def __infer_operation(fitted_estimator: Any) -> Callable:
         # Figure out what `fitted_estimator` must do according to its type.
 
-        def predict(estimator: Any, *args, **kwargs) -> np.ndarray:
-            return estimator.predict(*args, **kwargs).reshape((-1, 1))
+        def predict(
+                estimator: Any,
+                X: np.array,
+                *args, **kwargs
+                ) -> np.ndarray:
+            return estimator.predict(X).reshape((-1, 1))
 
-        def predict_proba(estimator: Any, *args, **kwargs) -> np.ndarray:
-            # Last column is dropped, because probabilities sum up to 1.
-            return estimator.predict_proba(*args, **kwargs)[:, :-1]
+        def predict_proba(
+                estimator: Any,
+                X: np.array,
+                *args, **kwargs
+                ) -> np.ndarray:
 
-        def transform(estimator: Any, *args, **kwargs) -> np.ndarray:
-            result = estimator.transform(*args, **kwargs)
+            def predict_proba_for_all_classes(
+                    estimator: Any,
+                    X: np.array,
+                    train_labels: Union[List[int], range],
+                    n_all_labels: int
+                    ) -> np.array:
+                # Take into consideration that some classes may be not
+                # represented on training folds.
+                if isinstance(train_labels, range):
+                    train_labels = list(train_labels)
+                train_labels = [int(x) for x in train_labels]
+                preds = np.zeros((X.shape[0], n_all_labels))
+                preds[:, train_labels] = estimator.predict_proba(X)
+                # Last column is dropped, because probabilities sum up to 1.
+                preds = preds[:, :-1]
+                return preds
+
+            return predict_proba_for_all_classes(estimator, X, *args, **kwargs)
+
+        def transform(
+                estimator: Any,
+                X: np.array,
+                *args, **kwargs
+                ) -> np.ndarray:
+            result = estimator.transform(X)
             result = (
                 result if len(result.shape) > 1 else result.reshape((-1, 1))
             )
@@ -173,14 +204,17 @@ class BaseStacking(BaseEstimator):
             X: np.ndarray,
             y: np.ndarray,
             fit_kwargs: Optional[Dict[Any, Dict[str, Any]]] = None,
-            meta_fit_kwargs: Optional[Dict[str, Any]] = None
+            meta_fit_kwargs: Optional[Dict[str, Any]] = None,
             ) -> 'BaseStacking':
         # Implement internal logic of fitting.
 
         X, y = check_X_y(X, y)
+        if self.is_classifier:
+            self.classes_, y = np.unique(y, return_inverse=True)
+
         base_estimators = self._create_base_estimators()
-        fit_kwargs = fit_kwargs or {x: dict() for x in base_estimators}
         splitter = self._create_splitter()
+        fit_kwargs = fit_kwargs or {x: dict() for x in base_estimators}
 
         self.base_estimators_ = []
 
@@ -196,7 +230,10 @@ class BaseStacking(BaseEstimator):
                     **fit_kwargs.get(estimator, dict())
                 )
                 current_meta_feature_on_fold = apply_fn(
-                    estimator, X[hold_out_indices, :]
+                    estimator,
+                    X[hold_out_indices, :],
+                    sorted(np.unique(y[fit_indices]).tolist()),
+                    len(self.classes_) if self.is_classifier else 0
                 )
                 current_meta_feature.append(current_meta_feature_on_fold)
             current_meta_x = np.vstack(current_meta_feature)
@@ -241,7 +278,12 @@ class BaseStacking(BaseEstimator):
         meta_features = []
         for estimator in self.base_estimators_:
             apply_fn = self.__infer_operation(estimator)
-            current_meta_feature = apply_fn(estimator, X)
+            if self.is_classifier:
+                current_meta_feature = apply_fn(
+                    estimator, X, range(len(self.classes_)), len(self.classes_)
+                )
+            else:
+                current_meta_feature = apply_fn(estimator, X, 0, 0)
             meta_features.append(current_meta_feature)
         meta_X = np.hstack(meta_features)
 
@@ -276,6 +318,28 @@ class StackingRegressor(BaseStacking, RegressorMixin):
 
     """
 
+    def __init__(
+            self,
+            base_estimators_types: Optional[List[type]] = None,
+            base_estimators_params: Optional[List[Dict[str, Any]]] = None,
+            meta_estimator_type: Optional[Any] = None,
+            meta_estimator_params: Optional[Dict[str, Any]] = None,
+            splitter: Optional[FoldType] = None,
+            keep_meta_X: bool = True,
+            random_state: Optional[int] = None
+            ):
+        self.is_classifier = False
+        # Style of `sklearn` prohibits usage of `*args` and `**kwargs`.
+        super().__init__(
+            base_estimators_types,
+            base_estimators_params,
+            meta_estimator_type,
+            meta_estimator_params,
+            splitter,
+            keep_meta_X,
+            random_state
+        )
+
     @classmethod
     def _can_this_class_have_any_instances(cls):
         # Allow this class to have instances.
@@ -304,6 +368,28 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
 
     """
 
+    def __init__(
+            self,
+            base_estimators_types: Optional[List[type]] = None,
+            base_estimators_params: Optional[List[Dict[str, Any]]] = None,
+            meta_estimator_type: Optional[Any] = None,
+            meta_estimator_params: Optional[Dict[str, Any]] = None,
+            splitter: Optional[FoldType] = None,
+            keep_meta_X: bool = True,
+            random_state: Optional[int] = None
+            ):
+        self.is_classifier = True
+        # Style of `sklearn` prohibits usage of `*args` and `**kwargs`.
+        super().__init__(
+            base_estimators_types,
+            base_estimators_params,
+            meta_estimator_type,
+            meta_estimator_params,
+            splitter,
+            keep_meta_X,
+            random_state
+        )
+
     @classmethod
     def _can_this_class_have_any_instances(cls):
         # Allow this class to have instances.
@@ -311,7 +397,7 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
 
     def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
-        default_types = [RandomForestClassifier, KNeighborsClassifier]
+        default_types = [RandomForestClassifier, LogisticRegression]
         types = self.base_estimators_types or default_types
         base_estimators = (
             self._create_base_estimators_from_their_types(types)

@@ -9,7 +9,6 @@ models.
 
 
 import unittest
-import warnings
 from typing import Tuple
 
 import numpy as np
@@ -182,11 +181,27 @@ class TestStackingRegressor(unittest.TestCase):
         self.assertTrue(np.allclose(result, true_answer))
 
 
+class TestStackingClassifier(unittest.TestCase):
+    """
+    Tests of `StackingRegressor` class.
+    """
+
+    def test_compatibility_with_sklearn(self) -> type(None):
+        """
+        Test that `sklearn` API is fully supported.
+
+        :return:
+            None
+        """
+        check_estimator(StackingClassifier)
+
+
 def main():
     test_loader = unittest.TestLoader()
     suites_list = []
     testers = [
-        TestStackingRegressor()
+        TestStackingRegressor(),
+        TestStackingClassifier()
     ]
     for tester in testers:
         suite = test_loader.loadTestsFromModule(tester)
