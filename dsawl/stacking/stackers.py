@@ -15,6 +15,7 @@ from sklearn.base import (
     RegressorMixin, ClassifierMixin, TransformerMixin
 )
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+from sklearn.utils.multiclass import check_classification_targets
 from sklearn.model_selection import (
     KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
 )
@@ -417,7 +418,7 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
 
     def _preprocess_target_variable(self, y: np.ndarray) -> np.ndarray:
         # Convert class labels to dense integers.
-        # TODO: Can `sklearn.utils.multiclass` help?
+        check_classification_targets(y)
         self.classes_, y = np.unique(y, return_inverse=True)
         return y
 
@@ -444,6 +445,10 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
             ) -> np.ndarray:
         # Make predictions with meta-estimator.
         if return_probabilities:
+            if not hasattr(self.meta_estimator_, 'predict_proba'):
+                raise NotImplementedError(
+                    "Second stage estimator has not `predict_proba` method."
+                )
             predictions = self.meta_estimator_.predict_proba(meta_X)
         else:
             raw_predictions = self.meta_estimator_.predict(meta_X)
@@ -463,8 +468,4 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
         :param X:
         :return:
         """
-        if not hasattr(self.meta_estimator_, 'predict_proba'):
-            raise NotImplementedError(
-                "Second stage estimator has not `predict_proba` method."
-            )
         return self._predict(X, return_probabilities=True)
