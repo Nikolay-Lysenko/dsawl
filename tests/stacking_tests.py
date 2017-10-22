@@ -18,7 +18,7 @@ from sklearn.utils.estimator_checks import check_estimator
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 
-from dsawl.stacking.stackers import StackingRegressor
+from dsawl.stacking.stackers import StackingRegressor, StackingClassifier
 
 
 def get_dataset_for_regression() -> Tuple[np.ndarray, np.ndarray]:
@@ -75,10 +75,8 @@ class TestStackingRegressor(unittest.TestCase):
         """
         X, y = get_dataset_for_regression()
         rgr = StackingRegressor(
-            base_estimators_params={
-                LinearRegression: [dict()],
-                KNeighborsRegressor: [{'n_neighbors': 1}]
-            },
+            base_estimators_types=[LinearRegression, KNeighborsRegressor],
+            base_estimators_params=[dict(), {'n_neighbors': 1}],
             keep_meta_X=True
         )
         rgr.fit(X, y)
@@ -117,7 +115,9 @@ class TestStackingRegressor(unittest.TestCase):
 
     def test_fit_with_defaults(self) -> type(None):
         """
-        Test that `fit` method with all arguments left untouched runs.
+        Test that `fit` method with all arguments left untouched runs
+        (more things can not be tested, because random seeds are not
+        set by default).
 
         :return:
             None
@@ -126,27 +126,25 @@ class TestStackingRegressor(unittest.TestCase):
         rgr = StackingRegressor()
         rgr.fit(X, y)
 
-    def test_that_fit_warns(self) -> type(None):
+    def test_that_fit_raises_on_wrong_lengths(self) -> type(None):
         """
-        Test that `fit` method warns if a base estimator is dropped.
+        Test that `fit` method raises an exception if lengths of
+        base estimators' types and parameters mismatch.
 
         :return:
             None
         """
         X, y = get_dataset_for_regression()
         rgr = StackingRegressor(
-            base_estimators_params={
-                LinearRegression: [],
-                KNeighborsRegressor: [{'n_neighbors': 1}]
-            },
-            keep_meta_X=True
+            base_estimators_types=[LinearRegression, KNeighborsRegressor],
+            base_estimators_params=[{'n_neighbors': 1}]
         )
-        with warnings.catch_warnings(record=True) as caught_warnings:
+        message = ''
+        try:
             rgr.fit(X, y)
-            self.assertTrue(len(caught_warnings) == 1)
-            self.assertTrue(
-                issubclass(caught_warnings[-1].category, RuntimeWarning)
-            )
+        except ValueError as e:
+            message = str(e)
+        self.assertTrue('Lengths mismatch' in message)
 
     def test_predict(self) -> type(None):
         """
@@ -163,10 +161,8 @@ class TestStackingRegressor(unittest.TestCase):
             dtype=float
         )
         rgr = StackingRegressor(
-            base_estimators_params={
-                LinearRegression: [dict()],
-                KNeighborsRegressor: [{'n_neighbors': 1}]
-            }
+            base_estimators_types=[LinearRegression, KNeighborsRegressor],
+            base_estimators_params=[dict(), {'n_neighbors': 1}]
         )
 
         # Fit `StackingRegressor` manually.

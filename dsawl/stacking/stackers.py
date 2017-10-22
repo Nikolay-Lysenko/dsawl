@@ -6,22 +6,21 @@
 # TODO: Write above docstring.
 
 
-import warnings
 from typing import List, Dict, Tuple, Callable, Union, Optional, Any
 
 import numpy as np
 
 from sklearn.base import (
     BaseEstimator,
-    RegressorMixin, ClassifierMixin, TransformerMixin,
-    clone
+    RegressorMixin, ClassifierMixin, TransformerMixin
 )
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.model_selection import (
     KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
 )
-from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 
 
 # For the sake of convenience, define a new type.
@@ -31,67 +30,99 @@ FoldType = Union[KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit]
 class BaseStacking(BaseEstimator):
     """
 
+    :param random_state:
+        random state for all estimators and first stage splitting;
+        if it is set, it overrides all other random states,
+        i.e., the ones that are set in `base_estimators_params`,
+        `meta_estimator_params`, and `splitter`.
     """
 
     def __init__(
             self,
-            base_estimators: Optional[List[Any]] = None,
-            base_estimators_params:
-                Optional[Dict[Any, List[Dict[str, Any]]]] = None,
-            meta_estimator: Optional[Any] = None,
+            base_estimators_types: Optional[List[type]] = None,
+            base_estimators_params: Optional[List[Dict[str, Any]]] = None,
+            meta_estimator_type: Optional[Any] = None,
             meta_estimator_params: Optional[Dict[str, Any]] = None,
             splitter: Optional[FoldType] = None,
-            keep_meta_X: bool = True
+            keep_meta_X: bool = True,
+            random_state: Optional[int] = None
             ):
         self._can_this_class_have_any_instances()
-        self.base_estimators = base_estimators
+        self.base_estimators_types = base_estimators_types
         self.base_estimators_params = base_estimators_params
-        self.meta_estimator = meta_estimator
+        self.meta_estimator_type = meta_estimator_type
         self.meta_estimator_params = meta_estimator_params
         self.splitter = splitter
         self.keep_meta_X = keep_meta_X
+        self.random_state = random_state
 
     @classmethod
     def _can_this_class_have_any_instances(cls):
         # Make this class abstract.
         raise TypeError('{} must not have any instances.'.format(cls))
 
-    def _set_base_estimators(self) -> List[BaseEstimator]:
+    def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
         pass
 
-    def _instantiate_base_estimators_from_stubs_and_params(
+    def _create_base_estimators_from_their_types(
             self,
-            stubs: List[BaseEstimator],
-            params: Dict[Any, List[Dict[str, Any]]]
+            types: List[type]
             ) -> List[BaseEstimator]:
-        # Create a list of base estimators from a list of their instances and
-        # a mapping from their types to all their parameters.
+        # Create a list of base estimators from a list of their types and
+        # parameters of `self`.
 
         # Validate input.
-        for estimator_type, params_list in params.items():
-            if len(params_list) == 0:
-                warnings.warn(
-                    '{} will be removed from list '.format(estimator_type) +
-                    'of base estimators due to empty list of parameters.',
-                    RuntimeWarning
-                )
+        params = (
+            self.base_estimators_params or
+            [dict() for _ in range(len(types))]
+        )
+        if len(types) != len(params):
+            raise ValueError(
+                (
+                    'Lengths mismatch: `base_estimators_types` has length {}, '
+                    'whereas `base_estimator_params` has length {}.'
+                ).format(len(types), len(params))
+            )
 
-        base_estimators = [
-            [
-                clone(estimator).set_params(**kwargs)
-                for kwargs in params.get( type(estimator), [dict()])
-            ]
-            for estimator in stubs
+        pairs = zip(types, params)
+        pairs = [
+            (t, p)
+            if 'random_state' not in t().get_params().keys()
+            else (t, dict(p, **{'random_state': self.random_state}))
+            for t, p in pairs
         ]
         base_estimators = [
-            estimator for sublist in base_estimators for estimator in sublist
+            estimator_type().set_params(**params)
+            for estimator_type, params in pairs
         ]
         return base_estimators
 
-    def _set_meta_estimator(self) -> BaseEstimator:
+    def _create_meta_estimator(self) -> BaseEstimator:
         # Instantiate second stage estimator from initialization parameters.
         pass
+
+    def _create_meta_estimator_by_its_type(
+            self,
+            meta_estimator_type: type,
+            ) -> BaseEstimator:
+        # Instantiate second stage estimator by its type and parameters
+        # of `self`.
+        meta_estimator_params = self.meta_estimator_params or dict()
+        if 'random_state' in meta_estimator_type().get_params().keys():
+            meta_estimator_params['random_state'] = self.random_state
+        meta_estimator = (
+            meta_estimator_type()
+            .set_params(**meta_estimator_params)
+        )
+        return meta_estimator
+
+    def _create_splitter(self) -> FoldType:
+        # Create splitter that is used for the first stage of stacking.
+        splitter = self.splitter or KFold()
+        if hasattr(splitter, 'shuffle') and splitter.shuffle:
+            splitter.random_state = self.random_state
+        return splitter
 
     @staticmethod
     def __infer_operation(fitted_estimator: Any) -> Callable:
@@ -147,9 +178,9 @@ class BaseStacking(BaseEstimator):
         # Implement internal logic of fitting.
 
         X, y = check_X_y(X, y)
-        base_estimators = self._set_base_estimators()
+        base_estimators = self._create_base_estimators()
         fit_kwargs = fit_kwargs or {x: dict() for x in base_estimators}
-        splitter = self.splitter or KFold()
+        splitter = self._create_splitter()
 
         self.base_estimators_ = []
 
@@ -179,7 +210,7 @@ class BaseStacking(BaseEstimator):
             )
         meta_X = np.hstack(meta_features)
 
-        meta_estimator = self._set_meta_estimator()
+        meta_estimator = self._create_meta_estimator()
         meta_fit_kwargs = meta_fit_kwargs or dict()
         self.meta_estimator_ = meta_estimator.fit(meta_X, y, **meta_fit_kwargs)
         if self.keep_meta_X:
@@ -250,27 +281,21 @@ class StackingRegressor(BaseStacking, RegressorMixin):
         # Allow this class to have instances.
         pass
 
-    def _set_base_estimators(self) -> List[BaseEstimator]:
+    def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
-
-        # Replace `None` values with the corresponding default values.
-        default_estimators = [LinearRegression(), KNeighborsRegressor()]
-        base_estimators = self.base_estimators or default_estimators
-        default_params = {type(x): [dict()] for x in base_estimators}
-        base_estimators_params = self.base_estimators_params or default_params
-
+        default_types = [RandomForestRegressor, KNeighborsRegressor]
+        types = self.base_estimators_types or default_types
         base_estimators = (
-            self._instantiate_base_estimators_from_stubs_and_params(
-                base_estimators, base_estimators_params
-            )
+            self._create_base_estimators_from_their_types(types)
         )
         return base_estimators
 
-    def _set_meta_estimator(self) -> BaseEstimator:
+    def _create_meta_estimator(self) -> BaseEstimator:
         # Instantiate second stage estimator from initialization parameters.
-        meta_estimator = self.meta_estimator or LinearRegression()
-        meta_estimator_params = self.meta_estimator_params or dict()
-        meta_estimator.set_params(**meta_estimator_params)
+        meta_estimator_type = self.meta_estimator_type or LinearRegression
+        meta_estimator = self._create_meta_estimator_by_its_type(
+            meta_estimator_type
+        )
         return meta_estimator
 
 
@@ -284,27 +309,21 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
         # Allow this class to have instances.
         pass
 
-    def _set_base_estimators(self) -> List[BaseEstimator]:
+    def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
-
-        # Replace `None` values with the corresponding default values.
-        default_estimators = [LogisticRegression(), KNeighborsClassifier()]
-        base_estimators = self.base_estimators or default_estimators
-        default_params = {type(x): [dict()] for x in base_estimators}
-        base_estimators_params = self.base_estimators_params or default_params
-
+        default_types = [RandomForestClassifier, KNeighborsClassifier]
+        types = self.base_estimators_types or default_types
         base_estimators = (
-            self._instantiate_base_estimators_from_stubs_and_params(
-                base_estimators, base_estimators_params
-            )
+            self._create_base_estimators_from_their_types(types)
         )
         return base_estimators
 
-    def _set_meta_estimator(self) -> BaseEstimator:
+    def _create_meta_estimator(self) -> BaseEstimator:
         # Instantiate second stage estimator from initialization parameters.
-        meta_estimator = self.meta_estimator or LogisticRegression()
-        meta_estimator_params = self.meta_estimator_params or dict()
-        meta_estimator.set_params(**meta_estimator_params)
+        meta_estimator_type = self.meta_estimator_type or LogisticRegression
+        meta_estimator = self._create_meta_estimator_by_its_type(
+            meta_estimator_type
+        )
         return meta_estimator
 
     def predict_proba(
