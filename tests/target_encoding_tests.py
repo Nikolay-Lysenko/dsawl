@@ -539,7 +539,7 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
             estimator_params=dict(),
             splitter=KFold()
         )
-        rgr.fit(X, y, fit_kwargs={TargetEncoder: {'source_positions': [1]}})
+        rgr.fit(X, y, source_positions=[1])
         learnt_slopes = rgr.meta_estimator_.coef_
         true_answer = np.array([1.8, 0.8])
         self.assertTrue(np.allclose(learnt_slopes, true_answer))
@@ -648,7 +648,7 @@ class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
             estimator_params={'random_state': 361},
             splitter=KFold()
         )
-        clf.fit(X, y, fit_kwargs={TargetEncoder: {'source_positions': [1]}})
+        clf.fit(X, y, source_positions=[1])
         learnt_slopes = clf.meta_estimator_.coef_
         true_answer = np.array([[0.48251806, -0.16291334]])
         self.assertTrue(np.allclose(learnt_slopes, true_answer))

@@ -1,9 +1,10 @@
 """
----
+This module provides tools for stacking a model on top of other
+models without information leakage from a target variable to
+predictions made by base models.
 
 @author: Nikolay Lysenko
 """
-# TODO: Write above docstring.
 
 
 from typing import List, Dict, Tuple, Callable, Union, Optional, Any
@@ -11,8 +12,7 @@ from typing import List, Dict, Tuple, Callable, Union, Optional, Any
 import numpy as np
 
 from sklearn.base import (
-    BaseEstimator,
-    RegressorMixin, ClassifierMixin, TransformerMixin
+    BaseEstimator, RegressorMixin, ClassifierMixin
 )
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import check_classification_targets
@@ -21,7 +21,10 @@ from sklearn.model_selection import (
 )
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.pipeline import Pipeline
+
+from .utils import InitablePipeline
 
 
 # For the sake of convenience, define a new type.
@@ -30,7 +33,25 @@ FoldType = Union[KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit]
 
 class BaseStacking(BaseEstimator):
     """
+    A parent class for regression and classification stacking.
 
+    :param base_estimators_types:
+        list of types of first stage estimators, a type can occur
+        multiple times here
+    :param base_estimators_params:
+        list of (hyper)parameters of first stage estimators such
+        that its i-th element relates to the i-th element of
+        `base_estimator_types`
+    :param meta_estimator_type:
+        a type of second stage estimator
+    :param meta_estimator_params:
+        (hyper)parameters of second stage estimator
+    :param splitter:
+        an object that splits learning sample into folds for
+        first stage estimators training
+    :param keep_meta_X:
+        if it is `True`, out-of-fold predictions made by first stage
+        estimators are stored in the attribute named `meta_X_`
     :param random_state:
         random state for all estimators and first stage splitting;
         if it is set, it overrides all other random states,
@@ -42,7 +63,7 @@ class BaseStacking(BaseEstimator):
             self,
             base_estimators_types: Optional[List[type]] = None,
             base_estimators_params: Optional[List[Dict[str, Any]]] = None,
-            meta_estimator_type: Optional[BaseEstimator] = None,
+            meta_estimator_type: Optional[type] = None,
             meta_estimator_params: Optional[Dict[str, Any]] = None,
             splitter: Optional[FoldType] = None,
             keep_meta_X: bool = True,
@@ -76,6 +97,7 @@ class BaseStacking(BaseEstimator):
         # parameters of `self`.
 
         # Validate input.
+        types = [x if x != Pipeline else InitablePipeline for x in types]
         params = (
             self.base_estimators_params or
             [dict() for _ in range(len(types))]
@@ -105,13 +127,22 @@ class BaseStacking(BaseEstimator):
         # Instantiate second stage estimator from initialization parameters.
         raise NotImplementedError
 
-    def _create_meta_estimator_by_its_type(
+    def _create_meta_estimator_from_its_type(
             self,
             meta_estimator_type: type,
             ) -> BaseEstimator:
-        # Instantiate second stage estimator by its type and parameters
+        # Instantiate second stage estimator based on its type and parameters
         # of `self`.
+        if meta_estimator_type == Pipeline:
+            meta_estimator_type = InitablePipeline
         meta_estimator_params = self.meta_estimator_params or dict()
+        # TODO: Delete if all is OK without it.
+        # if meta_estimator_type == Pipeline:
+        #     meta_estimator = (
+        #         Pipeline(steps=[('arbitrary_step', LinearRegression())])
+        #         .set_params(**meta_estimator_params)
+        #     )
+        # else:
         if 'random_state' in meta_estimator_type().get_params().keys():
             meta_estimator_params['random_state'] = self.random_state
         meta_estimator = (
@@ -165,7 +196,7 @@ class BaseStacking(BaseEstimator):
             self,
             X: np.ndarray,
             y: np.ndarray,
-            fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
+            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
             meta_fit_kwargs: Optional[Dict[str, Any]] = None,
             ) -> 'BaseStacking':
         # Implement internal logic of fitting.
@@ -175,7 +206,9 @@ class BaseStacking(BaseEstimator):
 
         base_estimators = self._create_base_estimators()
         splitter = self._create_splitter()
-        fit_kwargs = fit_kwargs or {x: dict() for x in base_estimators}
+        base_fit_kwargs = (
+            base_fit_kwargs or {x: dict() for x in base_estimators}
+        )
 
         self.base_estimators_ = []
 
@@ -188,8 +221,7 @@ class BaseStacking(BaseEstimator):
                 estimator.fit(
                     X[fit_indices, :],
                     y[fit_indices],
-                    # TODO: What if there are two estimators of the same type?
-                    **fit_kwargs.get(estimator, dict())
+                    **base_fit_kwargs.get(estimator, dict())
                 )
                 current_meta_feature_on_fold = (
                     self._apply_fitted_base_estimator(
@@ -205,7 +237,7 @@ class BaseStacking(BaseEstimator):
             meta_features.append(current_meta_x)
             # After all folds are processed, fit `estimator` to whole dataset.
             self.base_estimators_.append(
-                estimator.fit(X, y, **fit_kwargs.get(estimator, dict()))
+                estimator.fit(X, y, **base_fit_kwargs.get(estimator, dict()))
             )
         meta_X = np.hstack(meta_features)
 
@@ -220,12 +252,27 @@ class BaseStacking(BaseEstimator):
             self,
             X: np.ndarray,
             y: np.ndarray,
-            fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
+            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
             meta_fit_kwargs: Optional[Dict[str, Any]] = None
             ) -> 'BaseStacking':
         """
+        Train estimators from both stages of stacking.
+
+        :param X:
+            features
+        :param y:
+            target
+        :param base_fit_kwargs:
+            settings of first stage estimators training, first stage
+            estimators are identified by their types, as of now two
+            estimators of the same type can not have different
+            settings
+        :param meta_fit_kwargs:
+            settings of second stage estimator training
+        :return:
+            fitted instance
         """
-        return self._fit(X, y, fit_kwargs, meta_fit_kwargs)
+        return self._fit(X, y, base_fit_kwargs, meta_fit_kwargs)
 
     def _predict_on_the_second_stage(
             self,
@@ -270,14 +317,18 @@ class BaseStacking(BaseEstimator):
             X: np.ndarray,
             ) -> np.ndarray:
         """
+        Predict target variable on a new dataset.
 
         :param X:
+            features
         :return:
+            predictions
         """
         return self._predict(X, return_probabilities=False)
 
     def drop_training_meta_features(self) -> type(None):
         """
+        Delete a sample on which second stage estimator was trained.
 
         :return:
             None
@@ -287,7 +338,10 @@ class BaseStacking(BaseEstimator):
 
 class StackingRegressor(BaseStacking, RegressorMixin):
     """
-
+    A class that allows training a regressor on predictions made by
+    other regressors and/or transformations made by transformers.
+    Information does not leak through predictions and transformations,
+    because all of them are made in an out-of-fold manner.
     """
 
     @classmethod
@@ -307,7 +361,7 @@ class StackingRegressor(BaseStacking, RegressorMixin):
     def _create_meta_estimator(self) -> BaseEstimator:
         # Instantiate second stage estimator from initialization parameters.
         meta_estimator_type = self.meta_estimator_type or LinearRegression
-        meta_estimator = self._create_meta_estimator_by_its_type(
+        meta_estimator = self._create_meta_estimator_from_its_type(
             meta_estimator_type
         )
         return meta_estimator
@@ -326,9 +380,9 @@ class StackingRegressor(BaseStacking, RegressorMixin):
             )
             return result
 
-        if isinstance(fitted_estimator, RegressorMixin):
+        if hasattr(fitted_estimator, 'predict'):
             return predict
-        elif isinstance(fitted_estimator, TransformerMixin):
+        elif hasattr(fitted_estimator, 'transform'):
             return transform
         else:
             raise ValueError(
@@ -338,7 +392,10 @@ class StackingRegressor(BaseStacking, RegressorMixin):
 
 class StackingClassifier(BaseStacking, ClassifierMixin):
     """
-
+    A class that allows training a classifier on predictions made by
+    other classifiers and/or transformations made by transformers.
+    Information does not leak through predictions and transformations,
+    because all of them are made in an out-of-fold manner.
     """
 
     @classmethod
@@ -358,7 +415,7 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
     def _create_meta_estimator(self) -> BaseEstimator:
         # Instantiate second stage estimator from initialization parameters.
         meta_estimator_type = self.meta_estimator_type or LogisticRegression
-        meta_estimator = self._create_meta_estimator_by_its_type(
+        meta_estimator = self._create_meta_estimator_from_its_type(
             meta_estimator_type
         )
         return meta_estimator
@@ -407,12 +464,11 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
             )
             return result
 
-        if isinstance(fitted_estimator, ClassifierMixin):
-            if hasattr(fitted_estimator, 'predict_proba'):
-                return predict_proba
-            else:
-                return predict
-        elif isinstance(fitted_estimator, TransformerMixin):
+        if hasattr(fitted_estimator, 'predict_proba'):
+            return predict_proba
+        elif hasattr(fitted_estimator, 'predict'):
+            return predict
+        elif hasattr(fitted_estimator, 'transform'):
             return transform
         else:
             raise ValueError(
@@ -467,8 +523,11 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
             X: np.ndarray
             ) -> np.ndarray:
         """
+        Predict probabilities of classes on a new dataset.
 
         :param X:
+            features
         :return:
+            estimated probabilities of classes
         """
         return self._predict(X, return_probabilities=True)

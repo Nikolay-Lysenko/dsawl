@@ -16,15 +16,15 @@ from typing import List, Dict, Callable, Any, Optional
 
 import numpy as np
 
-from .target_encoder import TargetEncoder, FoldType
+from .target_encoder import TargetEncoder
 from dsawl.stacking.stackers import (
-    BaseStacking, StackingRegressor, StackingClassifier
+    BaseStacking, StackingRegressor, StackingClassifier,
+    FoldType
 )
 
 
 def _init(
         instance: BaseStacking,
-        type_of_instance: type,
         estimator_type: Optional[type] = None,
         estimator_params: Optional[Dict] = None,
         splitter: Optional[FoldType] = None,
@@ -50,11 +50,31 @@ def _init(
             'drop_source_features': drop_source_features
         }
     ]
-    super(type_of_instance, instance).__init__(
+    super(type(instance), instance).__init__(
         base_estimators_types, base_estimators_params,
         estimator_type, estimator_params,
         splitter
     )
+
+
+def _fit(
+        instance: BaseStacking,
+        X: np.ndarray,
+        y: np.ndarray,
+        source_positions: Optional[List[int]] = None,
+        fit_kwargs: Optional[Dict[str, Any]] = None
+        ) -> BaseStacking:
+    # A private function that allows getting rid of code duplication
+    # between `fit` methods. See more in documentation on `fit` of
+    # `OutOfFoldTargetEncodingRegressor` or `OfFoldTargetEncodingClassifier`.
+    super(type(instance), instance).fit(
+        X, y,
+        base_fit_kwargs={
+            TargetEncoder: {'source_positions': source_positions}
+        },
+        meta_fit_kwargs=fit_kwargs,
+    )
+    return instance
 
 
 def _fit_predict(
@@ -63,19 +83,19 @@ def _fit_predict(
         y: np.ndarray,
         source_positions: Optional[List[int]] = None,
         fit_kwargs: Optional[Dict[str, Any]] = None,
-        return_probabilities: Optional[bool] = False
+        return_probabilities: bool = False
         ) -> np.ndarray:
     # A private function that allows getting rid of code duplication
     # between `fit_predict` methods. See more in documentation on
     # `fit_predict` of `OutOfFoldTargetEncodingRegressor` or
     # `OfFoldTargetEncodingClassifier`.
     if instance.keep_meta_X is False:
-        raise ValueError(
-            'Currently, `keep_meta_X` attribute is `False`.'
+        raise AttributeError(
+            '`fit_predict` is available only if `keep_meta_X` is `True`.'
         )
-    instance.fit(
+    super(type(instance), instance).fit(
         X, y,
-        fit_kwargs={
+        base_fit_kwargs={
             TargetEncoder: {'source_positions': source_positions}
         },
         meta_fit_kwargs=fit_kwargs,
@@ -131,7 +151,6 @@ class OutOfFoldTargetEncodingRegressor(StackingRegressor):
             ):
         _init(
             self,
-            type(self),
             estimator_type,
             estimator_params,
             splitter,
@@ -140,6 +159,30 @@ class OutOfFoldTargetEncodingRegressor(StackingRegressor):
             min_frequency,
             drop_source_features
         )
+
+    def fit(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            source_positions: Optional[List[int]] = None,
+            fit_kwargs: Optional[Dict[str, Any]] = None
+            ) -> StackingRegressor:
+        """
+        Train model on data that are augmented by target encoding..
+
+        :param X:
+            features
+        :param y:
+            target
+        :param source_positions:
+            indices of initial features to be used as conditions,
+            default is the last one
+        :param fit_kwargs:
+            settings of internal estimator fit
+        :return:
+            fitted instance
+        """
+        return _fit(self, X, y, source_positions, fit_kwargs)
 
     def fit_predict(
             self,
@@ -211,7 +254,6 @@ class OutOfFoldTargetEncodingClassifier(StackingClassifier):
             ):
         _init(
             self,
-            type(self),
             estimator_type,
             estimator_params,
             splitter,
@@ -220,6 +262,30 @@ class OutOfFoldTargetEncodingClassifier(StackingClassifier):
             min_frequency,
             drop_source_features
         )
+
+    def fit(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            source_positions: Optional[List[int]] = None,
+            fit_kwargs: Optional[Dict[str, Any]] = None
+            ) -> StackingClassifier:
+        """
+        Train model on data that are augmented by target encoding..
+
+        :param X:
+            features
+        :param y:
+            target
+        :param source_positions:
+            indices of initial features to be used as conditions,
+            default is the last one
+        :param fit_kwargs:
+            settings of internal estimator fit
+        :return:
+            fitted instance
+        """
+        return _fit(self, X, y, source_positions, fit_kwargs)
 
     def fit_predict(
             self,
