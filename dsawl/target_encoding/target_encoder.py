@@ -11,20 +11,16 @@ This trick is sometimes called target encoding.
 """
 
 
-from typing import List, Tuple, Callable, Union, Optional
+from typing import List, Tuple, Callable, Optional
 
 import numpy as np
 import pandas as pd
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-from sklearn.model_selection import (
-    KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit
-)
+from sklearn.model_selection import KFold, TimeSeriesSplit
 
-
-# For the sake of convenience, define a new type.
-FoldType = Union[KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit]
+from dsawl.stacking.stackers import FoldType
 
 
 class TargetEncoder(BaseEstimator, TransformerMixin):
@@ -45,6 +41,9 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
 
     Also this class allows avoiding overfitting by generating
     new features based only on out-of-fold values of target.
+
+    NB: As of now, multi-label classification is not supported,
+    only binary classification and regression are supported.
 
     :param aggregators:
         functions that compute aggregates, default is mean function

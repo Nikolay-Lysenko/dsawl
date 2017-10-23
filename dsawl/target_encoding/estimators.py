@@ -12,27 +12,113 @@ generation of features that are aggregates of target value.
 """
 
 
-from typing import List, Dict, Tuple, Callable, Any, Optional
+from typing import List, Dict, Callable, Any, Optional
 
 import numpy as np
 
-from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
-from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-from sklearn.utils.multiclass import unique_labels
-from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.preprocessing import LabelEncoder
-
-from .target_encoder import TargetEncoder, FoldType
+from .target_encoder import TargetEncoder
+from dsawl.stacking.stackers import (
+    BaseStacking, StackingRegressor, StackingClassifier,
+    FoldType
+)
 
 
-class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
+def _init(
+        instance: BaseStacking,
+        estimator_type: Optional[type] = None,
+        estimator_params: Optional[Dict] = None,
+        splitter: Optional[FoldType] = None,
+        aggregators: Optional[List[Callable]] = None,
+        smoothing_strength: float = 0.0,
+        min_frequency: int = 1,
+        drop_source_features: bool = True
+        ) -> BaseStacking:
+    # A private function that allows getting rid of code duplication
+    # between `__init__` method of `OutOfFoldTargetEncodingRegressor`
+    # and `__init__` method of `OutOfFoldTargetEncodingClassifier`.
+    instance.aggregators = aggregators
+    instance.smoothing_strength = smoothing_strength
+    instance.min_frequency = min_frequency
+    instance.drop_source_features = drop_source_features
+
+    base_estimators_types = [TargetEncoder]
+    base_estimators_params = [
+        {
+            'aggregators': aggregators,
+            'smoothing_strength': smoothing_strength,
+            'min_frequency': min_frequency,
+            'drop_source_features': drop_source_features
+        }
+    ]
+    super(type(instance), instance).__init__(
+        base_estimators_types, base_estimators_params,
+        estimator_type, estimator_params,
+        splitter
+    )
+
+
+def _fit(
+        instance: BaseStacking,
+        X: np.ndarray,
+        y: np.ndarray,
+        source_positions: Optional[List[int]] = None,
+        fit_kwargs: Optional[Dict[str, Any]] = None
+        ) -> BaseStacking:
+    # A private function that allows getting rid of code duplication
+    # between `fit` methods. See more in documentation on `fit` of
+    # `OutOfFoldTargetEncodingRegressor` or `OfFoldTargetEncodingClassifier`.
+    super(type(instance), instance).fit(
+        X, y,
+        base_fit_kwargs={
+            TargetEncoder: {'source_positions': source_positions}
+        },
+        meta_fit_kwargs=fit_kwargs,
+    )
+    return instance
+
+
+def _fit_predict(
+        instance: BaseStacking,
+        X: np.ndarray,
+        y: np.ndarray,
+        source_positions: Optional[List[int]] = None,
+        fit_kwargs: Optional[Dict[str, Any]] = None,
+        return_probabilities: bool = False
+        ) -> np.ndarray:
+    # A private function that allows getting rid of code duplication
+    # between `fit_predict` methods. See more in documentation on
+    # `fit_predict` of `OutOfFoldTargetEncodingRegressor` or
+    # `OfFoldTargetEncodingClassifier`.
+    if instance.keep_meta_X is False:
+        raise AttributeError(
+            '`fit_predict` is available only if `keep_meta_X` is `True`.'
+        )
+    super(type(instance), instance).fit(
+        X, y,
+        base_fit_kwargs={
+            TargetEncoder: {'source_positions': source_positions}
+        },
+        meta_fit_kwargs=fit_kwargs,
+    )
+    if return_probabilities:
+        predictions = instance.meta_estimator_.predict_proba(instance.meta_X_)
+    else:
+        predictions = instance.meta_estimator_.predict(instance.meta_X_)
+    return predictions
+
+
+class OutOfFoldTargetEncodingRegressor(StackingRegressor):
     """
-    Parent class for regression and classification estimators.
-    It should not be instantiated.
+    Regressor that has out-of-fold generation of target-based
+    features before training.
+    Internally, it is a stacking such that the first stage model
+    transforms data with target encoding and the second stage model
+    uses these transformed data.
 
-    :param estimator:
-        internal estimator to be fitted
-    :param estimator_kwargs:
+    :param estimator_type:
+        type (class) of internal estimator (i.e., second stage
+        estimator)
+    :param estimator_params:
         (hyper)parameters of internal estimator
     :param splitter:
         object that splits data into folds, default schema is
@@ -55,73 +141,24 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
 
     def __init__(
             self,
-            estimator: Optional[BaseEstimator] = None,
-            estimator_kwargs: Optional[Dict] = None,
+            estimator_type: Optional[type] = None,
+            estimator_params: Optional[Dict] = None,
             splitter: Optional[FoldType] = None,
             aggregators: Optional[List[Callable]] = None,
             smoothing_strength: float = 0.0,
             min_frequency: int = 1,
             drop_source_features: bool = True
             ):
-        self._can_this_class_have_any_instances()
-        self.estimator = estimator
-        self.estimator_kwargs = estimator_kwargs
-        self.splitter = splitter
-        self.aggregators = aggregators
-        self.smoothing_strength = smoothing_strength
-        self.min_frequency = min_frequency
-        self.drop_source_features = drop_source_features
-        self._extended_X = None
-
-    @classmethod
-    def _can_this_class_have_any_instances(cls):
-        # Make this class abstract.
-        raise TypeError('{} must not have any instances.'.format(cls))
-
-    def _set_internal_estimator(self):
-        # Instantiate nested estimator from initialization parameters.
-        pass
-
-    def _do_supplementary_preparations(
+        _init(
             self,
-            X: np.ndarray,
-            y: np.ndarray
-            ) -> Tuple[np.ndarray, np.ndarray]:
-        # Transform `X` and `y` specially for regression or classification.
-        return X, y
-
-    def _fit(
-            self,
-            X: np.ndarray,
-            y: np.ndarray,
-            source_positions: Optional[List[int]] = None,
-            fit_kwargs: Optional[Dict[str, Any]] = None,
-            save_training_features_as_attr: bool = False
-            ) -> 'BaseOutOfFoldTargetEncodingEstimator':
-        # Run all internal logic of fitting.
-
-        X, y = check_X_y(X, y)
-        X_, y_ = self._do_supplementary_preparations(X, y)
-
-        self.estimator_ = self._set_internal_estimator()
-        self.target_encoder_ = TargetEncoder(
-            self.aggregators,
-            self.splitter,
-            self.smoothing_strength,
-            self.min_frequency,
-            self.drop_source_features
+            estimator_type,
+            estimator_params,
+            splitter,
+            aggregators,
+            smoothing_strength,
+            min_frequency,
+            drop_source_features
         )
-        extended_X = self.target_encoder_.fit_transform_out_of_fold(
-            X,
-            y_,
-            source_positions
-        )
-
-        fit_kwargs = fit_kwargs or dict()
-        self.estimator_.fit(extended_X, y, **fit_kwargs)
-        if save_training_features_as_attr:
-            self._extended_X = extended_X
-        return self
 
     def fit(
             self,
@@ -129,13 +166,9 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
             y: np.ndarray,
             source_positions: Optional[List[int]] = None,
             fit_kwargs: Optional[Dict[str, Any]] = None
-            ) -> 'BaseOutOfFoldTargetEncodingEstimator':
+            ) -> StackingRegressor:
         """
-        Fit estimator to a dataset where conditional aggregates of
-        target variable are generated and used as features.
-
-        Risk of overfitting is reduced, because for each object
-        its own target is not used for generation of its new features.
+        Train model on data that are augmented by target encoding..
 
         :param X:
             features
@@ -147,36 +180,9 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         :param fit_kwargs:
             settings of internal estimator fit
         :return:
-            fitted estimator (instance of the class)
+            fitted instance
         """
-        self._fit(X, y, source_positions, fit_kwargs,
-                  save_training_features_as_attr=False)
-        return self
-
-    def predict(
-            self,
-            X: np.ndarray
-            ) -> np.ndarray:
-        """
-        Make predictions for objects represented as `X`.
-
-        Note that, ideally, `X` must not overlap with the sample
-        that is used for fitting of the current instance, because
-        else leakage of information about target occurs.
-        If you need in predictions for learning sample, use
-        `fit_predict` method.
-
-        :param X:
-            features of objects
-        :return:
-            predictions
-        """
-        check_is_fitted(self, ['target_encoder_'])
-        X = check_array(X)
-
-        extended_X = self.target_encoder_.transform(X)
-        predictions = self.estimator_.predict(extended_X)
-        return predictions
+        return _fit(self, X, y, source_positions, fit_kwargs)
 
     def fit_predict(
             self,
@@ -187,6 +193,7 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
             ) -> np.ndarray:
         """
         Train model and make predictions for the training set.
+        This method differs from composition of `fit` and `predict`.
 
         :param X:
             features
@@ -200,103 +207,71 @@ class BaseOutOfFoldTargetEncodingEstimator(BaseEstimator):
         :return:
             predictions
         """
-        try:
-            self._fit(X, y, source_positions, fit_kwargs,
-                      save_training_features_as_attr=True)
-            predictions = self.estimator_.predict(self._extended_X)
-            return predictions
-        finally:
-            self._extended_X = None
+        return _fit_predict(self, X, y, source_positions, fit_kwargs)
 
 
-class OutOfFoldTargetEncodingRegressor(
-        BaseOutOfFoldTargetEncodingEstimator, RegressorMixin
-        ):
-    """
-    Regressor that has out-of-fold generation of target-based
-    features before training.
-    """
-
-    @classmethod
-    def _can_this_class_have_any_instances(cls):
-        # Allow this class to have instances.
-        pass
-
-    def _set_internal_estimator(self) -> BaseEstimator:
-        # Instantiate estimator from initialization parameters.
-        estimator = self.estimator or LinearRegression()
-        estimator_kwargs = self.estimator_kwargs or dict()
-        return estimator.set_params(**estimator_kwargs)
-
-
-class OutOfFoldTargetEncodingClassifier(
-        BaseOutOfFoldTargetEncodingEstimator, ClassifierMixin
-        ):
+class OutOfFoldTargetEncodingClassifier(StackingClassifier):
     """
     Classifier that has out-of-fold generation of target-based
     features before training.
+    Internally, it is a stacking such that the first stage model
+    transforms data with target encoding and the second stage model
+    uses these transformed data.
+
+    :param estimator_type:
+        type (class) of internal estimator (i.e., second stage
+        estimator)
+    :param estimator_params:
+        (hyper)parameters of internal estimator
+    :param splitter:
+        object that splits data into folds, default schema is
+        Leave-One-Out
+    :param aggregators:
+        functions that compute aggregates, default is mean function
+    :param smoothing_strength:
+        strength of smoothing towards unconditional aggregates for
+        target-based features creation (aka target encoding),
+        by default there is no smoothing
+    :param min_frequency:
+        minimal number of occurrences of a feature's value (if value
+        occurs less times than this parameter, this value is mapped to
+        unconditional aggregate), by default it is 1
+    :param drop_source_features:
+        to drop or to keep at training stage those of initial features
+        that are used for conditioning over them at new features'
+        generation stage, default is to drop
     """
 
-    @classmethod
-    def _can_this_class_have_any_instances(cls):
-        # Allow this class to have instances.
-        pass
-
-    def _set_internal_estimator(self) -> BaseEstimator:
-        # Instantiate estimator from initialization parameters.
-        estimator = self.estimator or LogisticRegression()
-        estimator_kwargs = self.estimator_kwargs or dict()
-        return estimator.set_params(**estimator_kwargs)
-
-    def _do_supplementary_preparations(
+    def __init__(
             self,
-            X: np.ndarray,
-            y: np.ndarray
-            ) -> Tuple[np.ndarray, np.ndarray]:
-        # Take into account nuances of classification.
-        self.classes_ = unique_labels(y)
-        if len(np.unique(y)) > 2:
-            raise ValueError(
-                "As of now, only binary classification is supported."
-            )
-        y_ = LabelEncoder().fit_transform(y)
-        return X, y_
-
-    def predict_proba(
+            estimator_type: Optional[type] = None,
+            estimator_params: Optional[Dict] = None,
+            splitter: Optional[FoldType] = None,
+            aggregators: Optional[List[Callable]] = None,
+            smoothing_strength: float = 0.0,
+            min_frequency: int = 1,
+            drop_source_features: bool = True
+            ):
+        _init(
             self,
-            X: np.ndarray
-            ) -> np.ndarray:
-        """
-        Predict class probabilities for objects represented as `X`.
+            estimator_type,
+            estimator_params,
+            splitter,
+            aggregators,
+            smoothing_strength,
+            min_frequency,
+            drop_source_features
+        )
 
-        If you need in probabilities' predictions for learning sample,
-        use `fit_predict_proba` method.
-
-        :param X:
-            features of objects
-        :return:
-            predicted probabilities
-        """
-        check_is_fitted(self, ['target_encoder_'])
-        if not hasattr(self.estimator_, "predict_proba"):
-            raise NotImplementedError(
-                "Internal estimator has not `predict_proba` method."
-            )
-
-        extended_X = self.target_encoder_.transform(X)
-        predicted_probabilities = self.estimator_.predict_proba(extended_X)
-        return predicted_probabilities
-
-    def fit_predict_proba(
+    def fit(
             self,
             X: np.ndarray,
             y: np.ndarray,
-            source_positions: List[int],
+            source_positions: Optional[List[int]] = None,
             fit_kwargs: Optional[Dict[str, Any]] = None
-            ) -> np.ndarray:
+            ) -> StackingClassifier:
         """
-        Train model and predict class probabilities for the
-        training set.
+        Train model on data that are augmented by target encoding..
 
         :param X:
             features
@@ -308,17 +283,60 @@ class OutOfFoldTargetEncodingClassifier(
         :param fit_kwargs:
             settings of internal estimator fit
         :return:
-            predicted probabilities
+            fitted instance
         """
-        if not hasattr(self.estimator, "predict_proba"):
-            raise NotImplementedError(
-                "Internal estimator has not `predict_proba` method."
-            )
-        try:
-            self._fit(X, y, source_positions, fit_kwargs,
-                      save_training_features_as_attr=True)
-            predicted_probabilities = \
-                self.estimator_.predict_proba(self._extended_X)
-            return predicted_probabilities
-        finally:
-            self._extended_X = None
+        return _fit(self, X, y, source_positions, fit_kwargs)
+
+    def fit_predict(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            source_positions: Optional[List[int]] = None,
+            fit_kwargs: Optional[Dict[str, Any]] = None
+            ) -> np.ndarray:
+        """
+        Train model and make predictions for the training set.
+        This method differs from composition of `fit` and `predict`.
+
+        :param X:
+            features
+        :param y:
+            target
+        :param source_positions:
+            indices of initial features to be used as conditions,
+            default is the last one
+        :param fit_kwargs:
+            settings of internal estimator fit
+        :return:
+            predictions
+        """
+        return _fit_predict(self, X, y, source_positions, fit_kwargs)
+
+    def fit_predict_proba(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            source_positions: Optional[List[int]] = None,
+            fit_kwargs: Optional[Dict[str, Any]] = None
+            ) -> np.ndarray:
+        """
+        Train model and predict class probabilities for the training
+        set.
+        This method differs from composition of `fit` and
+        `predict_proba`.
+
+        :param X:
+            features
+        :param y:
+            target
+        :param source_positions:
+            indices of initial features to be used as conditions,
+            default is the last one
+        :param fit_kwargs:
+            settings of internal estimator fit
+        :return:
+            estimated probabilities of classes
+        """
+        return _fit_predict(
+            self, X, y, source_positions, fit_kwargs, return_probabilities=True
+        )

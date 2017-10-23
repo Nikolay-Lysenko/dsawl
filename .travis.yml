@@ -25,7 +25,9 @@ branches:
   - develop
 
 script:
-  - coverage run tests/target_encoding_tests.py
+  - COVERAGE_FILE=.coverage_s coverage run tests/stacking_tests.py
+  - COVERAGE_FILE=.coverage_te coverage run tests/target_encoding_tests.py
+  - coverage combine .coverage_s .coverage_te
 
 after_success:
   - codecov
