@@ -85,16 +85,24 @@ class BaseStacking(BaseEstimator):
             '{} must not have any instances.'.format(cls)
         )
 
-    def __validate_base_estimators(
+    def __preprocess_base_estimators_sources(
             self,
             types: List[type]
             ) -> Tuple[List[type], List[Dict[str, Any]]]:
-        # Validate types and parameters of base estimators.
+        # Prepare types and parameters of base estimators.
         types = [x if x != Pipeline else InitablePipeline for x in types]
         params = (
             self.base_estimators_params or
             [dict() for _ in range(len(types))]
         )
+        return types, params
+
+    @staticmethod
+    def __check_base_estimators_sources(
+            types: List[type],
+            params: List[Dict[str, Any]]
+            ) -> type(None):
+        # Check that `types` has the same length as `params`.
         if len(types) != len(params):
             raise ValueError(
                 (
@@ -102,7 +110,6 @@ class BaseStacking(BaseEstimator):
                     'whereas `base_estimator_params` has length {}.'
                 ).format(len(types), len(params))
             )
-        return types, params
 
     def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
@@ -114,7 +121,8 @@ class BaseStacking(BaseEstimator):
             ) -> List[BaseEstimator]:
         # Create a list of base estimators from a list of their types and
         # parameters of `self`.
-        types, params = self.__validate_base_estimators(types)
+        types, params = self.__preprocess_base_estimators_sources(types)
+        self.__check_base_estimators_sources(types, params)
         pairs = zip(types, params)
         pairs = [
             (t, p)
