@@ -85,18 +85,11 @@ class BaseStacking(BaseEstimator):
             '{} must not have any instances.'.format(cls)
         )
 
-    def _create_base_estimators(self) -> List[BaseEstimator]:
-        # Instantiate base estimators from initialization parameters.
-        raise NotImplementedError
-
-    def _create_base_estimators_from_their_types(
+    def __validate_base_estimators(
             self,
             types: List[type]
-            ) -> List[BaseEstimator]:
-        # Create a list of base estimators from a list of their types and
-        # parameters of `self`.
-
-        # Validate input.
+            ) -> Tuple[List[type], List[Dict[str, Any]]]:
+        # Validate types and parameters of base estimators.
         types = [x if x != Pipeline else InitablePipeline for x in types]
         params = (
             self.base_estimators_params or
@@ -109,7 +102,19 @@ class BaseStacking(BaseEstimator):
                     'whereas `base_estimator_params` has length {}.'
                 ).format(len(types), len(params))
             )
+        return types, params
 
+    def _create_base_estimators(self) -> List[BaseEstimator]:
+        # Instantiate base estimators from initialization parameters.
+        raise NotImplementedError
+
+    def _create_base_estimators_from_their_types(
+            self,
+            types: List[type]
+            ) -> List[BaseEstimator]:
+        # Create a list of base estimators from a list of their types and
+        # parameters of `self`.
+        types, params = self.__validate_base_estimators(types)
         pairs = zip(types, params)
         pairs = [
             (t, p)
@@ -136,13 +141,6 @@ class BaseStacking(BaseEstimator):
         if meta_estimator_type == Pipeline:
             meta_estimator_type = InitablePipeline
         meta_estimator_params = self.meta_estimator_params or dict()
-        # TODO: Delete if all is OK without it.
-        # if meta_estimator_type == Pipeline:
-        #     meta_estimator = (
-        #         Pipeline(steps=[('arbitrary_step', LinearRegression())])
-        #         .set_params(**meta_estimator_params)
-        #     )
-        # else:
         if 'random_state' in meta_estimator_type().get_params().keys():
             meta_estimator_params['random_state'] = self.random_state
         meta_estimator = (
@@ -192,25 +190,21 @@ class BaseStacking(BaseEstimator):
         result = apply_fn(estimator, X)
         return result
 
-    def _fit(
+    def _fit_base_estimators(
             self,
             X: np.ndarray,
             y: np.ndarray,
-            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
-            meta_fit_kwargs: Optional[Dict[str, Any]] = None,
-            ) -> 'BaseStacking':
-        # Implement internal logic of fitting.
-
-        X, y = check_X_y(X, y)
-        y = self._preprocess_target_variable(y)
-
+            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None
+            ) -> np.ndarray:
+        # Collect out-of-fold predictions of all base estimators that are
+        # trained on all folds except the one for which predictions are
+        # being made, fit base estimators to a whole learning sample,
+        # and return matrix of out-of-fold predictions.
         base_estimators = self._create_base_estimators()
-        splitter = self._create_splitter()
         base_fit_kwargs = (
             base_fit_kwargs or {x: dict() for x in base_estimators}
         )
-
-        self.base_estimators_ = []
+        splitter = self._create_splitter()
 
         folds = list(splitter.split(X))
         meta_features = []
@@ -240,10 +234,37 @@ class BaseStacking(BaseEstimator):
                 estimator.fit(X, y, **base_fit_kwargs.get(estimator, dict()))
             )
         meta_X = np.hstack(meta_features)
+        return meta_X
 
+    def _fit_meta_estimator(
+            self,
+            meta_X: np.ndarray,
+            y: np.ndarray,
+            meta_fit_kwargs: Optional[Dict[str, Any]] = None
+            ) -> type(None):
+        # Fit second stage estimator on out-of-fold predictions made by first
+        # stage estimators.
         meta_estimator = self._create_meta_estimator()
         meta_fit_kwargs = meta_fit_kwargs or dict()
         self.meta_estimator_ = meta_estimator.fit(meta_X, y, **meta_fit_kwargs)
+
+    def _fit(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
+            meta_fit_kwargs: Optional[Dict[str, Any]] = None,
+            ) -> 'BaseStacking':
+        # Implement internal logic of fitting.
+
+        X, y = check_X_y(X, y)
+        y = self._preprocess_target_variable(y)
+
+        self.base_estimators_ = []
+        meta_X = self._fit_base_estimators(X, y, base_fit_kwargs)
+
+        self._fit_meta_estimator(meta_X, y, meta_fit_kwargs)
+
         if self.keep_meta_X:
             self.meta_X_ = meta_X
         return self
