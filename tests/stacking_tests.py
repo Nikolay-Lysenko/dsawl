@@ -412,6 +412,54 @@ class TestStackingClassifier(unittest.TestCase):
         """
         check_estimator(StackingClassifier)
 
+    def test_fit(self) -> type(None):
+        """
+        Test `fit` method.
+
+        :return:
+            None
+        """
+        X, y = get_dataset_for_classification()
+        clf = StackingClassifier(
+            base_estimators_types=[LogisticRegression, KNeighborsClassifier],
+            base_estimators_params=[dict(), {'n_neighbors': 1}],
+            random_state=361
+        )
+        clf.fit(X, y)
+        # Second column has probabilities of 0 class.
+        true_meta_X_ = np.array(
+            [[0.69944477, 1.0],
+             [0.71150077, 1.0],
+             [0.72326450, 1.0],
+             [0.73472740, 1.0],
+             [0.74588232, 1.0],
+             [0.11467189, 0.0],
+             [0.1687213, 0.0],
+             [0.24130277, 0.0],
+             [0.33261446, 0.0],
+             [0.98984866, 1.0],
+             [0.99417896, 1.0],
+             [0.99572679, 1.0],
+             [0.99686435, 1.0],
+             [0.99769978, 1.0],
+             [0.1056699, 0.0]]
+        )
+        self.assertTrue(np.allclose(clf.meta_X_, true_meta_X_))
+        true_coefs_of_base_lr = np.array([0.80295565, -1.11280117])
+        self.assertTrue(
+            np.allclose(
+                clf.base_estimators_[0].coef_,
+                true_coefs_of_base_lr
+            )
+        )
+        true_coefs_of_meta_estimator = np.array([-0.87613043, -1.5124705])
+        self.assertTrue(
+            np.allclose(
+                clf.meta_estimator_.coef_,
+                true_coefs_of_meta_estimator
+            )
+        )
+
     def test_fit_with_defaults(self) -> type(None):
         """
         Test that `fit` method with all arguments left untouched runs
@@ -424,6 +472,45 @@ class TestStackingClassifier(unittest.TestCase):
         X, y = get_dataset_for_classification()
         clf = StackingClassifier()
         clf.fit(X, y)
+
+    def test_fit_with_multiple_classes(self) -> type(None):
+        """
+        Test `fit` in multi-class classification problem.
+
+        :return:
+            None
+        """
+        dataset = np.array(
+            [[3, 4, 2],
+             [2, 1, 0],
+             [5, 7, 1],
+             [2, 4, 0],
+             [9, 1, 1],
+             [3, 3, 0],
+             [4, 2, 2],
+             [1, 1, 1],
+             [3, 2, 2]]
+        )
+        X = dataset[:, :-1]
+        y = dataset[:, -1]
+        clf = StackingClassifier(
+            base_estimators_types=[KNeighborsClassifier, KNeighborsClassifier],
+            base_estimators_params=[{'n_neighbors': 1}, {'n_neighbors': 2}],
+            random_state=361
+        )
+        clf.fit(X, y)
+        true_meta_X = np.array(
+            [[1.0, 0.0, 1.0, 0.0],
+             [0.0, 1.0, 0.0, 0.5],
+             [1.0, 0.0, 1.0, 0.0],
+             [0.0, 0.0, 0.0, 0.0],
+             [0.0, 0.0, 0.0, 0.0],
+             [0.0, 0.0, 0.0, 0.0],
+             [1.0, 0.0, 0.5, 0.0],
+             [1.0, 0.0, 1.0, 0.0],
+             [1.0, 0.0, 1.0, 0.0]]
+        )
+        self.assertTrue(np.allclose(clf.meta_X_, true_meta_X))
 
     def test_fit_without_predict_proba(self) -> type(None):
         """
@@ -440,7 +527,7 @@ class TestStackingClassifier(unittest.TestCase):
             base_estimators_params=[dict(), {'n_neighbors': 1}]
         )
         clf.fit(X, y)
-        # Second column has probabilities of 0 class.
+        # Again, second column has probabilities of 0 class.
         true_meta_X_ = np.array(
             [[0, 1],
              [0, 1],
