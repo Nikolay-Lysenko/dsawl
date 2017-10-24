@@ -12,5 +12,6 @@ exclude_lines =
     raise RuntimeError
     raise AttributeError
     raise ValueError
+    raise TypeError
     if __name__ == .__main__.:
     pass
