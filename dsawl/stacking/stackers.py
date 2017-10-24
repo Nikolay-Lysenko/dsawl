@@ -8,6 +8,7 @@ predictions made by base models.
 
 
 from typing import List, Dict, Tuple, Callable, Union, Optional, Any
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -31,7 +32,7 @@ from .utils import InitablePipeline
 FoldType = Union[KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit]
 
 
-class BaseStacking(BaseEstimator):
+class BaseStacking(BaseEstimator, ABC):
     """
     A parent class for regression and classification stacking.
 
@@ -56,7 +57,8 @@ class BaseStacking(BaseEstimator):
         random state for all estimators and first stage splitting;
         if it is set, it overrides all other random states,
         i.e., the ones that are set in `base_estimators_params`,
-        `meta_estimator_params`, and `splitter`.
+        `meta_estimator_params`, and `splitter`; it is not set
+        by default
     """
 
     def __init__(
@@ -69,7 +71,6 @@ class BaseStacking(BaseEstimator):
             keep_meta_X: bool = True,
             random_state: Optional[int] = None
             ):
-        self._can_this_class_have_any_instances()
         self.base_estimators_types = base_estimators_types
         self.base_estimators_params = base_estimators_params
         self.meta_estimator_type = meta_estimator_type
@@ -77,13 +78,6 @@ class BaseStacking(BaseEstimator):
         self.splitter = splitter
         self.keep_meta_X = keep_meta_X
         self.random_state = random_state
-
-    @classmethod
-    def _can_this_class_have_any_instances(cls):
-        # Make this class abstract.
-        raise NotImplementedError(
-            '{} must not have any instances.'.format(cls)
-        )
 
     @staticmethod
     def __preprocess_base_estimators_sources(
@@ -119,9 +113,10 @@ class BaseStacking(BaseEstimator):
 
         return pairs
 
+    @abstractmethod
     def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
-        raise NotImplementedError
+        pass
 
     def _create_base_estimators_from_their_types(
             self,
@@ -145,9 +140,10 @@ class BaseStacking(BaseEstimator):
         ]
         return base_estimators
 
+    @abstractmethod
     def _create_meta_estimator(self) -> BaseEstimator:
         # Instantiate second stage estimator from initialization parameters.
-        raise NotImplementedError
+        pass
 
     def _create_meta_estimator_from_its_type(
             self,
@@ -174,6 +170,7 @@ class BaseStacking(BaseEstimator):
         return splitter
 
     @staticmethod
+    @abstractmethod
     def _infer_operation(fitted_estimator: BaseEstimator) -> Callable:
         # Figure out what `fitted_estimator` must do according to its type.
         raise NotImplementedError
@@ -203,7 +200,8 @@ class BaseStacking(BaseEstimator):
             ) -> np.ndarray:
         # Use `estimator` on `X` with `apply_fn`.
         # It is a version for `StackingRegressor`.
-        # This method is overridden in `StackingClassifier`.
+        # This method is overridden in `StackingClassifier` and there `self`
+        # is used, so the method is not static.
         result = apply_fn(estimator, X)
         return result
 
@@ -382,11 +380,6 @@ class StackingRegressor(BaseStacking, RegressorMixin):
     because all of them are made in an out-of-fold manner.
     """
 
-    @classmethod
-    def _can_this_class_have_any_instances(cls):
-        # Allow this class to have instances.
-        pass
-
     def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
         default_types = [RandomForestRegressor, KNeighborsRegressor]
@@ -423,7 +416,7 @@ class StackingRegressor(BaseStacking, RegressorMixin):
         elif hasattr(fitted_estimator, 'transform'):
             return transform
         else:
-            raise ValueError(
+            raise TypeError(
                 'Invalid type of estimator: {}'.format(type(fitted_estimator))
             )
 
@@ -436,13 +429,13 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
     because all of them are made in an out-of-fold manner.
     """
 
-    @classmethod
-    def _can_this_class_have_any_instances(cls):
-        # Allow this class to have instances.
-        pass
-
     def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
+
+        # The list of default types is not analogous to that from
+        # `StackingRegressor`, because inclusion of `KNeighborsClassifier`
+        # instead of `LogisticRegression` causes occasional failure of
+        # `sklearn` support test (actually, the issue is with the test).
         default_types = [RandomForestClassifier, LogisticRegression]
         types = self.base_estimators_types or default_types
         base_estimators = (
@@ -509,7 +502,7 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
         elif hasattr(fitted_estimator, 'transform'):
             return transform
         else:
-            raise ValueError(
+            raise TypeError(
                 'Invalid type of estimator: {}'.format(type(fitted_estimator))
             )
 

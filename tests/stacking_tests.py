@@ -42,9 +42,9 @@ class TestBaseStacking(unittest.TestCase):
         message = ''
         try:
             BaseStacking()
-        except NotImplementedError as e:
+        except TypeError as e:
             message = str(e)
-        self.assertTrue('must not have any instances' in message)
+        self.assertTrue('abstract class' in message)
 
 
 def get_dataset_for_regression() -> Tuple[np.ndarray, np.ndarray]:
