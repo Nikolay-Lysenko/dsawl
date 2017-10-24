@@ -27,4 +27,7 @@ class InitablePipeline(Pipeline):
                 memory=memory
             )
         else:
-            super().__init__(steps, memory)  # pragma: no cover (unnecessary)
+            super().__init__(
+                steps=steps,
+                memory=memory
+            )  # pragma: no cover (this line should not be executed normally)
