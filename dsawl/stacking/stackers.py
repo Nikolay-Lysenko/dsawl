@@ -85,24 +85,23 @@ class BaseStacking(BaseEstimator):
             '{} must not have any instances.'.format(cls)
         )
 
+    @staticmethod
     def __preprocess_base_estimators_sources(
-            self,
-            types: List[type]
+            types: List[type],
+            params: List[Dict[str, Any]]
             ) -> Tuple[List[type], List[Dict[str, Any]]]:
-        # Prepare types and parameters of base estimators.
+        # Prepare types and parameters of base estimators, replace `None`s.
         types = [x if x != Pipeline else InitablePipeline for x in types]
-        params = (
-            self.base_estimators_params or
-            [dict() for _ in range(len(types))]
-        )
+        params = params or [dict() for _ in range(len(types))]
         return types, params
 
     @staticmethod
-    def __check_base_estimators_sources(
+    def __match_base_estimators_sources(
             types: List[type],
             params: List[Dict[str, Any]]
-            ) -> type(None):
-        # Check that `types` has the same length as `params`.
+            ) -> List[Tuple[type, Dict[str, Any]]]:
+        # Validate and zip `types` and `params`.
+
         if len(types) != len(params):
             raise ValueError(
                 (
@@ -110,6 +109,15 @@ class BaseStacking(BaseEstimator):
                     'whereas `base_estimator_params` has length {}.'
                 ).format(len(types), len(params))
             )
+
+        pairs = list(zip(types, params))
+
+        for estimator_type, estimator_params in pairs:
+            if (estimator_type == InitablePipeline and
+                    'steps' not in estimator_params.keys()):
+                raise ValueError('Argument `steps` is not passed to pipeline.')
+
+        return pairs
 
     def _create_base_estimators(self) -> List[BaseEstimator]:
         # Instantiate base estimators from initialization parameters.
@@ -121,9 +129,10 @@ class BaseStacking(BaseEstimator):
             ) -> List[BaseEstimator]:
         # Create a list of base estimators from a list of their types and
         # parameters of `self`.
-        types, params = self.__preprocess_base_estimators_sources(types)
-        self.__check_base_estimators_sources(types, params)
-        pairs = zip(types, params)
+        types, params = self.__preprocess_base_estimators_sources(
+            types, self.base_estimators_params
+        )
+        pairs = self.__match_base_estimators_sources(types, params)
         pairs = [
             (t, p)
             if 'random_state' not in t().get_params().keys()
