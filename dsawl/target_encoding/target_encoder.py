@@ -42,8 +42,17 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
     Also this class allows avoiding overfitting by generating
     new features based only on out-of-fold values of target.
 
-    NB: As of now, multi-label classification is not supported,
-    only binary classification and regression are supported.
+    NB: As of now, multi-label classification is not fully supported,
+    only binary classification and regression are fully supported.
+    Results for multi-label classification are adequate if class
+    labels are ordered and equally spaced (e.g., a difference between
+    'A' and 'B' grades is equal to a difference between 'B' and 'C'
+    grades). Since it can not be automatically detected whether these
+    conditions hold true, it is up to user to verify passed target
+    and there are no warnings. Passing classification target with more
+    than two distinct values such that they are not ordered and equally
+    spaced results in encoding that is not as good as union of encodings
+    based on binary indicators of the classes.
 
     :param aggregators:
         functions that compute aggregates, default is mean function
