@@ -13,6 +13,7 @@ generation of features that are aggregates of target value.
 
 
 from typing import List, Dict, Callable, Any, Optional
+import warnings
 
 import numpy as np
 
@@ -168,7 +169,7 @@ class OutOfFoldTargetEncodingRegressor(StackingRegressor):
             fit_kwargs: Optional[Dict[str, Any]] = None
             ) -> StackingRegressor:
         """
-        Train model on data that are augmented by target encoding..
+        Train model on data that are augmented by target encoding.
 
         :param X:
             features
@@ -271,7 +272,7 @@ class OutOfFoldTargetEncodingClassifier(StackingClassifier):
             fit_kwargs: Optional[Dict[str, Any]] = None
             ) -> StackingClassifier:
         """
-        Train model on data that are augmented by target encoding..
+        Train model on data that are augmented by target encoding.
 
         :param X:
             features
@@ -285,6 +286,13 @@ class OutOfFoldTargetEncodingClassifier(StackingClassifier):
         :return:
             fitted instance
         """
+        if len(np.unique(y)) > 2:
+            warnings.warn(
+                'If more than two class labels are not ordered and equally '
+                'spaced, results of their encoding can be poor. Please '
+                'consider encoding binary indicators of classes.',
+                RuntimeWarning
+            )
         return _fit(self, X, y, source_positions, fit_kwargs)
 
     def fit_predict(
