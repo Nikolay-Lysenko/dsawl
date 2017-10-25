@@ -13,7 +13,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from sklearn.base import (
-    BaseEstimator, RegressorMixin, ClassifierMixin
+    BaseEstimator, RegressorMixin, ClassifierMixin,
+    clone
 )
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import check_classification_targets
@@ -25,11 +26,26 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.pipeline import Pipeline
 
+from joblib import Parallel, delayed
+
 from .utils import InitablePipeline
 
 
 # For the sake of convenience, define a new type.
 FoldType = Union[KFold, StratifiedKFold, GroupKFold, TimeSeriesSplit]
+
+
+def _fit_estimator(
+        X: np.array,
+        y: np.array,
+        estimator: BaseEstimator,
+        fit_kwargs: Dict[str, Any]
+        ) -> BaseEstimator:
+    """
+    A private function for fitting base estimators in parallel.
+    It should not be called outside of this module.
+    """
+    return estimator.fit(X, y, **fit_kwargs)
 
 
 class BaseStacking(BaseEstimator, ABC):
@@ -59,6 +75,9 @@ class BaseStacking(BaseEstimator, ABC):
         i.e., the ones that are set in `base_estimators_params`,
         `meta_estimator_params`, and `splitter`; it is not set
         by default
+    :param n_jobs:
+        number of parallel jobs for fitting each of base estimators
+        to different folds
     """
 
     def __init__(
@@ -69,7 +88,8 @@ class BaseStacking(BaseEstimator, ABC):
             meta_estimator_params: Optional[Dict[str, Any]] = None,
             splitter: Optional[FoldType] = None,
             keep_meta_X: bool = True,
-            random_state: Optional[int] = None
+            random_state: Optional[int] = None,
+            n_jobs: int = 1
             ):
         self.base_estimators_types = base_estimators_types
         self.base_estimators_params = base_estimators_params
@@ -78,6 +98,7 @@ class BaseStacking(BaseEstimator, ABC):
         self.splitter = splitter
         self.keep_meta_X = keep_meta_X
         self.random_state = random_state
+        self.n_jobs = n_jobs
 
     @staticmethod
     def __preprocess_base_estimators_sources(
@@ -162,12 +183,27 @@ class BaseStacking(BaseEstimator, ABC):
         )
         return meta_estimator
 
-    def _create_splitter(self) -> FoldType:
+    def __create_splitter(self) -> FoldType:
         # Create splitter that is used for the first stage of stacking.
         splitter = self.splitter or KFold()
         if hasattr(splitter, 'shuffle') and splitter.shuffle:
             splitter.random_state = self.random_state
         return splitter
+
+    def __take_folds_data(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            folds: List[Tuple[np.ndarray, np.ndarray]]
+            ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
+        # Return lists of features and targets for fitting and hold-out
+        # features for making of out-of-fold predictions.
+        zipped_folds_data = [
+            (X[fit_indices, :], y[fit_indices], X[hold_out_indices, :])
+            for fit_indices, hold_out_indices in folds
+        ]
+        folds_data = tuple(list(data) for data in zip(*zipped_folds_data))
+        return folds_data
 
     @staticmethod
     @abstractmethod
@@ -205,6 +241,31 @@ class BaseStacking(BaseEstimator, ABC):
         result = apply_fn(estimator, X)
         return result
 
+    def __compute_meta_feature_produced_by_estimator(
+            self,
+            estimator_fits_to_folds: List[BaseEstimator],
+            apply_fn: Callable,
+            hold_out_Xs: List[np.ndarray],
+            fit_ys: List[np.ndarray]
+            ) -> np.ndarray:
+        # Collect all out-of-fold predictions produced by the estimator
+        # such that its clones trained on different folds are stored in
+        # `estimator_fits_to_folds` and combine these predictions in
+        # a single column.
+        meta_feature = [
+            self._apply_fitted_base_estimator(
+                apply_fn, estimator_on_other_folds, hold_out_X,
+                sorted(np.unique(fit_y).tolist())
+                if hasattr(self, 'classes_') else []
+            )
+            for estimator_on_other_folds, hold_out_X, fit_y
+            in zip(
+                estimator_fits_to_folds, hold_out_Xs, fit_ys
+            )
+        ]
+        meta_x = np.vstack(meta_feature)
+        return meta_x
+
     def _fit_base_estimators(
             self,
             X: np.ndarray,
@@ -215,31 +276,32 @@ class BaseStacking(BaseEstimator, ABC):
         # trained on all folds except the one for which predictions are
         # being made, fit base estimators to a whole learning sample,
         # and return matrix of out-of-fold predictions.
+
         base_estimators = self._create_base_estimators()
         base_fit_kwargs = (
             base_fit_kwargs or {x: dict() for x in base_estimators}
         )
-        splitter = self._create_splitter()
 
+        splitter = self.__create_splitter()
         folds = list(splitter.split(X))
+        fit_Xs, fit_ys, hold_out_Xs = self.__take_folds_data(
+            X, y, folds
+        )
+
         meta_features = []
         for estimator in base_estimators:
             apply_fn = self._infer_operation(estimator)
-            current_meta_feature = []
-            for fit_indices, hold_out_indices in folds:
-                estimator.fit(
-                    X[fit_indices, :],
-                    y[fit_indices],
-                    **base_fit_kwargs.get(estimator, dict())
+            estimator_fits_to_folds = Parallel(n_jobs=self.n_jobs)(
+                delayed(_fit_estimator)(
+                    *fit_data,
+                    clone(estimator),
+                    base_fit_kwargs.get(estimator, dict())
                 )
-                current_meta_feature_on_fold = (
-                    self._apply_fitted_base_estimator(
-                        apply_fn, estimator, X[hold_out_indices, :],
-                        sorted(np.unique(y[fit_indices]).tolist())
-                    )
-                )
-                current_meta_feature.append(current_meta_feature_on_fold)
-            current_meta_x = np.vstack(current_meta_feature)
+                for fit_data in zip(fit_Xs, fit_ys)
+            )
+            current_meta_x = self.__compute_meta_feature_produced_by_estimator(
+                estimator_fits_to_folds, apply_fn, hold_out_Xs, fit_ys
+            )
             current_meta_x = self.__restore_initial_order(
                 current_meta_x, folds
             )
