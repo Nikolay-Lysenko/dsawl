@@ -422,7 +422,7 @@ class BaseStacking(BaseEstimator, ABC):
         :return:
             predictions
         """
-        return self._predict(X, return_probabilities=False)
+        return self._predict(X)
 
     def drop_training_meta_features(self) -> type(None):
         """
@@ -432,6 +432,59 @@ class BaseStacking(BaseEstimator, ABC):
             None
         """
         self.meta_X_ = None
+
+    def _fit_predict(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
+            meta_fit_kwargs: Optional[Dict[str, Any]] = None,
+            return_probabilities: bool = False
+            ) -> np.ndarray:
+        # Implement internal logic of predicting for the training set.
+        keep_meta_X = self.keep_meta_X
+        self.keep_meta_X = True
+        self.fit(X, y, base_fit_kwargs, meta_fit_kwargs)
+        if return_probabilities:
+            predictions = self.meta_estimator_.predict_proba(self.meta_X_)
+        else:
+            predictions = self.meta_estimator_.predict(self.meta_X_)
+        self.keep_meta_X = keep_meta_X
+        if not keep_meta_X:
+            self.drop_training_meta_features()
+        return predictions
+
+    def fit_predict(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
+            meta_fit_kwargs: Optional[Dict[str, Any]] = None
+            ) -> np.ndarray:
+        """
+        Train stacking and predict target variable on a learning
+        sample.
+        This is needed for correct measuring of train error -
+        composition of calls to `fit` and `predict` does not produce
+        the same results, because features for second stage estimators
+        are produced on the whole learning sample there, whereas they
+        are produced out-of-fold here.
+
+        :param X:
+            features
+        :param y:
+            target
+        :param base_fit_kwargs:
+            settings of first stage estimators training, first stage
+            estimators are identified by their types, as of now two
+            estimators of the same type can not have different
+            settings
+        :param meta_fit_kwargs:
+            settings of second stage estimator training
+        :return:
+            predictions
+        """
+        return self._fit_predict(X, y, base_fit_kwargs, meta_fit_kwargs)
 
 
 class StackingRegressor(BaseStacking, RegressorMixin):
@@ -624,3 +677,37 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
             estimated probabilities of classes
         """
         return self._predict(X, return_probabilities=True)
+
+    def fit_predict_proba(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None,
+            meta_fit_kwargs: Optional[Dict[str, Any]] = None
+            ) -> np.ndarray:
+        """
+        Train stacking and predict class probabilities on a learning
+        sample.
+        This is needed for correct measuring of train performance -
+        composition of calls to `fit` and `predict_proba` does not
+        produce the same results, because features for second stage
+        estimators are produced on the whole learning sample there,
+        whereas they are produced out-of-fold here.
+
+        :param X:
+            features
+        :param y:
+            target
+        :param base_fit_kwargs:
+            settings of first stage estimators training, first stage
+            estimators are identified by their types, as of now two
+            estimators of the same type can not have different
+            settings
+        :param meta_fit_kwargs:
+            settings of second stage estimator training
+        :return:
+            predictions
+        """
+        return self._fit_predict(
+            X, y, base_fit_kwargs, meta_fit_kwargs, return_probabilities=True
+        )
