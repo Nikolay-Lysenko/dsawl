@@ -90,21 +90,17 @@ def _fit_predict(
     # between `fit_predict` methods. See more in documentation on
     # `fit_predict` of `OutOfFoldTargetEncodingRegressor` or
     # `OfFoldTargetEncodingClassifier`.
-    if instance.keep_meta_X is False:
-        raise AttributeError(
-            '`fit_predict` is available only if `keep_meta_X` is `True`.'
-        )
-    super(type(instance), instance).fit(
+    if return_probabilities:
+        fit_predict_fn = super(type(instance), instance).fit_predict_proba
+    else:
+        fit_predict_fn = super(type(instance), instance).fit_predict
+    predictions = fit_predict_fn(
         X, y,
         base_fit_kwargs={
             TargetEncoder: {'source_positions': source_positions}
         },
-        meta_fit_kwargs=fit_kwargs,
+        meta_fit_kwargs=fit_kwargs
     )
-    if return_probabilities:
-        predictions = instance.meta_estimator_.predict_proba(instance.meta_X_)
-    else:
-        predictions = instance.meta_estimator_.predict(instance.meta_X_)
     return predictions
 
 

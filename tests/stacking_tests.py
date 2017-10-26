@@ -548,6 +548,20 @@ class TestStackingClassifier(unittest.TestCase):
         )
         self.assertTrue(np.array_equal(clf.meta_X_, true_meta_X_))
 
+    def test_fit_predict_proba_with_false_in_keep_meta_X(self) -> type(None):
+        """
+        Test that `fit_predict_proba` does not modifies attributes
+        that must not be altered by it.
+
+        :return:
+            None
+        """
+        X, y = get_dataset_for_classification()
+        clf = StackingClassifier(keep_meta_X=False)
+        _ = clf.fit_predict_proba(X, y)
+        self.assertFalse(clf.keep_meta_X)
+        self.assertTrue(clf.meta_X_ is None)
+
 
 def main():
     test_loader = unittest.TestLoader()
