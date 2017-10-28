@@ -153,6 +153,7 @@ class BaseStacking(BaseEstimator, ABC):
         pairs = [
             (t, p)
             if 'random_state' not in t().get_params().keys()
+               or self.random_state is None
             else (t, dict(p, **{'random_state': self.random_state}))
             for t, p in pairs
         ]
@@ -184,10 +185,16 @@ class BaseStacking(BaseEstimator, ABC):
             ) -> BaseEstimator:
         # Instantiate second stage estimator based on its type and parameters
         # of `self`.
+
         if meta_estimator_type == Pipeline:
             meta_estimator_type = InitablePipeline
         meta_estimator_params = self.meta_estimator_params or dict()
-        if 'random_state' in meta_estimator_type().get_params().keys():
+
+        random_state_is_applicable = (
+            'random_state' in meta_estimator_type().get_params().keys()
+        )
+        random_state_is_set = self.random_state is not None
+        if random_state_is_applicable and random_state_is_set:
             meta_estimator_params['random_state'] = self.random_state
         meta_estimator = (
             meta_estimator_type()
@@ -198,7 +205,11 @@ class BaseStacking(BaseEstimator, ABC):
     def __create_splitter(self) -> FoldType:
         # Create splitter that is used for the first stage of stacking.
         splitter = self.splitter or KFold()
-        if hasattr(splitter, 'shuffle') and splitter.shuffle:
+        random_state_is_applicable = (
+            hasattr(splitter, 'shuffle') and splitter.shuffle
+        )
+        random_state_is_set = self.random_state is not None
+        if random_state_is_applicable and random_state_is_set:
             splitter.random_state = self.random_state
         return splitter
 

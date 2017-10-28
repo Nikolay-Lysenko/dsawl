@@ -18,7 +18,7 @@ from sklearn.utils.estimator_checks import check_estimator
 from sklearn.model_selection import KFold
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 
@@ -282,7 +282,7 @@ class TestStackingRegressor(unittest.TestCase):
 
     def test_fit_with_random_state(self) -> type(None):
         """
-        Test that several `fit` calls produce the same results if
+        Test that several calls of `fit` produce the same results if
         random state is set.
 
         :return:
@@ -303,6 +303,58 @@ class TestStackingRegressor(unittest.TestCase):
         second_importances = rgr.base_estimators_[0].feature_importances_
         self.assertTrue(np.array_equal(first_meta_X, second_meta_X))
         self.assertTrue(np.array_equal(first_importances, second_importances))
+
+    def test_fit_with_sample_weights(self) -> type(None):
+        """
+        Test `fit` with shuffling and second stage estimator that must
+        be trained only on some of the objects.
+        Also test that random seed works if it is set inside
+        `splitter`, not for a whole instance.
+
+        :return:
+            None
+        """
+        X, y = get_dataset_for_regression()
+        rgr = StackingRegressor(
+            base_estimators_types=[KNeighborsRegressor, KNeighborsRegressor],
+            base_estimators_params=[{'n_neighbors': 1}, {'n_neighbors': 2}],
+            splitter=KFold(shuffle=True, random_state=361)
+        )
+        sample_weight = np.array(
+            [0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1], dtype=float
+        )
+        rgr.fit(X, y, meta_fit_kwargs={'sample_weight': sample_weight})
+        true_meta_X = np.array(
+            [[15, 15],
+             [15, 15],
+             [11, 15],
+             [15, 19],
+             [19, 21],
+             [13, 13.5],
+             [13, 10.5],
+             [22, 17.5],
+             [16, 15],
+             [21, 16],
+             [15, 19],
+             [21, 25],
+             [23, 27],
+             [29, 26],
+             [8, 11]]
+        )
+        self.assertTrue(np.array_equal(rgr.meta_X_, true_meta_X))
+        indices = list(map(lambda x: x > 0, sample_weight.tolist()))
+        lr = LinearRegression().fit(true_meta_X[indices, :], y[indices])
+        true_coefs_of_meta_estimator = np.array([0.11326539, 0.90735827])
+        self.assertTrue(
+            np.allclose(
+                rgr.meta_estimator_.coef_,
+                true_coefs_of_meta_estimator
+            )
+        )
+        true_intercept_of_meta_estimator = 0.755864160903
+        self.assertAlmostEqual(
+            rgr.meta_estimator_.intercept_, true_intercept_of_meta_estimator
+        )
 
     def test_fit_without_saving(self) -> type(None):
         """
@@ -336,7 +388,7 @@ class TestStackingRegressor(unittest.TestCase):
             base_estimators_params=[dict(), {'n_neighbors': 1}]
         )
 
-        # Fit `StackingRegressor` manually.
+        # Fit `rgr` manually.
         X, y = get_dataset_for_regression()
         lr = LinearRegression().fit(X, y)
         kn = KNeighborsRegressor(n_neighbors=1).fit(X, y)
@@ -445,14 +497,14 @@ class TestStackingClassifier(unittest.TestCase):
              [0.1056699, 0.0]]
         )
         self.assertTrue(np.allclose(clf.meta_X_, true_meta_X_))
-        true_coefs_of_base_lr = np.array([0.80295565, -1.11280117])
+        true_coefs_of_base_lr = np.array([[0.80295565, -1.11280117]])
         self.assertTrue(
             np.allclose(
                 clf.base_estimators_[0].coef_,
                 true_coefs_of_base_lr
             )
         )
-        true_coefs_of_meta_estimator = np.array([-0.87613043, -1.5124705])
+        true_coefs_of_meta_estimator = np.array([[-0.87613043, -1.5124705]])
         self.assertTrue(
             np.allclose(
                 clf.meta_estimator_.coef_,
@@ -547,6 +599,83 @@ class TestStackingClassifier(unittest.TestCase):
             dtype=float
         )
         self.assertTrue(np.array_equal(clf.meta_X_, true_meta_X_))
+
+    def test_predict(self) -> type(None):
+        """
+        Test `predict` method.
+
+        :return:
+            None
+        """
+        X_test = np.array(
+            [[1, 5],
+             [-3, -4],
+             [7, 9],
+             [2, 1]],
+            dtype=float
+        )
+        clf = StackingClassifier(
+            base_estimators_types=[LogisticRegression, KNeighborsClassifier],
+            base_estimators_params=[dict(), {'n_neighbors': 1}],
+            random_state=361
+        )
+
+        # Fit `clf` manually.
+        X, y = get_dataset_for_classification()
+        lr = LogisticRegression(random_state=361).fit(X, y)
+        kn = KNeighborsRegressor(n_neighbors=1).fit(X, y)
+        clf.base_estimators_ = [lr, kn]
+        meta_estimator = LogisticRegression(random_state=361)
+        meta_estimator.coef_ = np.array([[-0.87613043, -1.5124705]])
+        meta_estimator.intercept_ = 0.535153999535
+        meta_estimator.classes_ = np.array([0, 1])
+        clf.meta_estimator_ = meta_estimator
+        clf.classes_ = np.array([0, 1])
+
+        result = clf.predict(X_test)
+        true_answer = np.array([0, 1, 0, 1])
+        self.assertTrue(np.allclose(result, true_answer))
+
+    def test_predict_proba(self) -> type(None):
+        """
+        Test `predict_proba` method.
+
+        :return:
+            None
+        """
+        X_test = np.array(
+            [[1, 6],
+             [-2, -4],
+             [7, 10],
+             [3, 1]],
+            dtype=float
+        )
+        clf = StackingClassifier(
+            base_estimators_types=[LogisticRegression, KNeighborsClassifier],
+            base_estimators_params=[dict(), {'n_neighbors': 1}],
+            random_state=361
+        )
+
+        # Fit `clf` manually.
+        X, y = get_dataset_for_classification()
+        lr = LogisticRegression(random_state=361).fit(X, y)
+        kn = KNeighborsRegressor(n_neighbors=1).fit(X, y)
+        clf.base_estimators_ = [lr, kn]
+        meta_estimator = LogisticRegression(random_state=361)
+        meta_estimator.coef_ = np.array([[-0.87613043, -1.5124705]])
+        meta_estimator.intercept_ = 0.535153999535
+        meta_estimator.classes_ = np.array([0, 1])
+        clf.meta_estimator_ = meta_estimator
+        clf.classes_ = np.array([0, 1])
+
+        result = clf.predict_proba(X_test)
+        true_answer = np.array(
+            [[0.58395508, 0.41604492],
+             [0.38338127, 0.61661873],
+             [0.58374647, 0.41625353],
+             [0.42309387, 0.57690613]]
+        )
+        self.assertTrue(np.allclose(result, true_answer))
 
     def test_fit_predict_proba_with_false_in_keep_meta_X(self) -> type(None):
         """
