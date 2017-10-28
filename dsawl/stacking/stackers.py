@@ -229,6 +229,7 @@ class BaseStacking(BaseEstimator, ABC):
             ) -> np.ndarray:
         # Rearrange data for the second stage model and get order of rows
         # that corresponds to initial order of objects.
+        # This is needed, because meta estimator can have sample weights.
         ordering_column = np.hstack([x[1] for x in folds]).reshape((-1, 1))
         meta_features = np.hstack((meta_features, ordering_column))
         meta_features = meta_features[meta_features[:, -1].argsort(), :-1]
