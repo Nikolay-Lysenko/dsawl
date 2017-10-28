@@ -412,8 +412,7 @@ class BaseStacking(BaseEstimator, ABC):
             return_probabilities: bool = False
             ) -> np.ndarray:
         # Make predictions with second stage estimator.
-        predictions = self.meta_estimator_.predict(meta_X)
-        return predictions
+        pass
 
     def _predict(
             self,
