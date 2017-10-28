@@ -134,7 +134,7 @@ class TargetEncoder(BaseEstimator, TransformerMixin):
         splitter = splitter or KFold(n_splits)
         return aggregators, source_positions, splitter
 
-    def __drop_source_features(self, transformed_X: np.array) -> np.array:
+    def __drop_source_features(self, transformed_X: np.ndarray) -> np.ndarray:
         # Remove from `X` features that has been used for conditioning.
         relevant_columns = [
             x
