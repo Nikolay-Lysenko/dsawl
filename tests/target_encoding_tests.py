@@ -593,6 +593,24 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
         true_answer = np.array([5.8, 2.2, 4, 1, 1.6, 3.4])
         self.assertTrue(np.allclose(result, true_answer))
 
+    def test_fit_predict_with_changed_source_positions(self) -> type(None):
+        """
+        Test `fit_predict` method when categorical feature is not in
+        the last column (which is default assumption).
+
+        :return:
+            None
+        """
+        X, y = get_dataset_for_regression()
+        X = np.hstack((X[:, 1].reshape((-1, 1)), X[:, 0].reshape((-1, 1))))
+        rgr = OutOfFoldTargetEncodingRegressor(
+            LinearRegression,
+            splitter=KFold()
+        )
+        result = rgr.fit_predict(X, y, source_positions=[0])
+        true_answer = np.array([5.8, 2.2, 4, 1, 1.6, 3.4])
+        self.assertTrue(np.allclose(result, true_answer))
+
 
 def get_dataset_for_classification() -> Tuple[np.ndarray, np.ndarray]:
     """
