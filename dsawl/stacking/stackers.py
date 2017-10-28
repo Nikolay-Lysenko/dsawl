@@ -161,6 +161,17 @@ class BaseStacking(BaseEstimator, ABC):
         ]
         return base_estimators
 
+    def __prepare_all_for_base_estimators_fitting(
+            self,
+            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None
+            ) -> Tuple[List[BaseEstimator], Dict[type, Dict[str, Any]]]:
+        # Run all preprocessing that is needed for base estimators fitting.
+        base_estimators = self._create_base_estimators()
+        base_fit_kwargs = (
+            base_fit_kwargs or {type(x): dict() for x in base_estimators}
+        )
+        return base_estimators, base_fit_kwargs
+
     @abstractmethod
     def _create_meta_estimator(self) -> BaseEstimator:
         # Instantiate second stage estimator from initialization parameters.
@@ -218,6 +229,7 @@ class BaseStacking(BaseEstimator, ABC):
             ) -> np.ndarray:
         # Rearrange data for the second stage model and get order of rows
         # that corresponds to initial order of objects.
+        # This is needed, because meta estimator can have sample weights.
         ordering_column = np.hstack([x[1] for x in folds]).reshape((-1, 1))
         meta_features = np.hstack((meta_features, ordering_column))
         meta_features = meta_features[meta_features[:, -1].argsort(), :-1]
@@ -266,7 +278,7 @@ class BaseStacking(BaseEstimator, ABC):
         meta_x = np.vstack(meta_feature)
         return meta_x
 
-    def _fit_base_estimators(
+    def __collect_out_of_fold_predictions(
             self,
             X: np.ndarray,
             y: np.ndarray,
@@ -274,12 +286,10 @@ class BaseStacking(BaseEstimator, ABC):
             ) -> np.ndarray:
         # Collect out-of-fold predictions of all base estimators that are
         # trained on all folds except the one for which predictions are
-        # being made, fit base estimators to a whole learning sample,
-        # and return matrix of out-of-fold predictions.
+        # being made and return matrix of out-of-fold predictions.
 
-        base_estimators = self._create_base_estimators()
-        base_fit_kwargs = (
-            base_fit_kwargs or {x: dict() for x in base_estimators}
+        base_estimators, base_fit_kwargs = (
+            self.__prepare_all_for_base_estimators_fitting(base_fit_kwargs)
         )
 
         splitter = self.__create_splitter()
@@ -295,7 +305,7 @@ class BaseStacking(BaseEstimator, ABC):
                 delayed(_fit_estimator)(
                     *fit_data,
                     clone(estimator),
-                    base_fit_kwargs.get(estimator, dict())
+                    base_fit_kwargs.get(type(estimator), dict())
                 )
                 for fit_data in zip(fit_Xs, fit_ys)
             )
@@ -306,10 +316,6 @@ class BaseStacking(BaseEstimator, ABC):
                 current_meta_x, folds
             )
             meta_features.append(current_meta_x)
-            # After all folds are processed, fit `estimator` to whole dataset.
-            self.base_estimators_.append(
-                estimator.fit(X, y, **base_fit_kwargs.get(estimator, dict()))
-            )
         meta_X = np.hstack(meta_features)
         return meta_X
 
@@ -325,6 +331,21 @@ class BaseStacking(BaseEstimator, ABC):
         meta_fit_kwargs = meta_fit_kwargs or dict()
         self.meta_estimator_ = meta_estimator.fit(meta_X, y, **meta_fit_kwargs)
 
+    def _fit_base_estimators(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None
+            ) -> type(None):
+        # Fit each of base estimators to a whole learning sample.
+        base_estimators, base_fit_kwargs = (
+            self.__prepare_all_for_base_estimators_fitting(base_fit_kwargs)
+        )
+        self.base_estimators_ = [
+            estimator.fit(X, y, **base_fit_kwargs.get(type(estimator), dict()))
+            for estimator in base_estimators
+        ]
+
     def _fit(
             self,
             X: np.ndarray,
@@ -337,13 +358,13 @@ class BaseStacking(BaseEstimator, ABC):
         X, y = check_X_y(X, y)
         y = self._preprocess_target_variable(y)
 
-        self.base_estimators_ = []
-        meta_X = self._fit_base_estimators(X, y, base_fit_kwargs)
+        self._fit_base_estimators(X, y, base_fit_kwargs)
 
+        meta_X = self.__collect_out_of_fold_predictions(X, y, base_fit_kwargs)
         self._fit_meta_estimator(meta_X, y, meta_fit_kwargs)
-
         if self.keep_meta_X:
             self.meta_X_ = meta_X
+
         return self
 
     def fit(
@@ -372,7 +393,7 @@ class BaseStacking(BaseEstimator, ABC):
         """
         return self._fit(X, y, base_fit_kwargs, meta_fit_kwargs)
 
-    def _predict_on_the_second_stage(
+    def _predict_at_the_second_stage(
             self,
             meta_X: np.ndarray,
             return_probabilities: Optional[bool] = False
@@ -405,7 +426,7 @@ class BaseStacking(BaseEstimator, ABC):
             meta_features.append(current_meta_feature)
         meta_X = np.hstack(meta_features)
 
-        predictions = self._predict_on_the_second_stage(
+        predictions = self._predict_at_the_second_stage(
             meta_X, return_probabilities
         )
         return predictions
@@ -444,7 +465,7 @@ class BaseStacking(BaseEstimator, ABC):
         # Implement internal logic of predicting for the training set.
         keep_meta_X = self.keep_meta_X
         self.keep_meta_X = True
-        self.fit(X, y, base_fit_kwargs, meta_fit_kwargs)
+        self._fit(X, y, base_fit_kwargs, meta_fit_kwargs)
         if return_probabilities:
             predictions = self.meta_estimator_.predict_proba(self.meta_X_)
         else:
@@ -643,7 +664,7 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
         )
         return result
 
-    def _predict_on_the_second_stage(
+    def _predict_at_the_second_stage(
             self,
             meta_X: np.ndarray,
             return_probabilities: Optional[bool] = False
