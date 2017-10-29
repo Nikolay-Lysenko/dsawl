@@ -342,8 +342,6 @@ class TestStackingRegressor(unittest.TestCase):
              [8, 11]]
         )
         self.assertTrue(np.array_equal(rgr.meta_X_, true_meta_X))
-        indices = list(map(lambda x: x > 0, sample_weight.tolist()))
-        lr = LinearRegression().fit(true_meta_X[indices, :], y[indices])
         true_coefs_of_meta_estimator = np.array([0.11326539, 0.90735827])
         self.assertTrue(
             np.allclose(
