@@ -197,8 +197,7 @@ class BaseStacking(BaseEstimator, ABC):
         if random_state_is_applicable and random_state_is_set:
             meta_estimator_params['random_state'] = self.random_state
         meta_estimator = (
-            meta_estimator_type()
-            .set_params(**meta_estimator_params)
+            meta_estimator_type().set_params(**meta_estimator_params)
         )
         return meta_estimator
 
@@ -247,7 +246,7 @@ class BaseStacking(BaseEstimator, ABC):
             X: np.ndarray,
             labels_from_training_folds: Optional[List[int]] = None
             ) -> np.ndarray:
-        # Use `estimator` on `X` with `apply_fn` that calls one of
+        # Use `estimator` on `X` with `apply_fn` which calls one of
         # `predict`, `predict_proba`, and `transform` methods.
         pass
 
@@ -289,7 +288,7 @@ class BaseStacking(BaseEstimator, ABC):
             ) -> np.ndarray:
         # Collect all out-of-fold predictions produced by the estimator
         # such that its clones trained on different folds are stored in
-        # `estimator_fits_to_folds` and combine these predictions in
+        # `estimator_fits_to_folds`, then combine these predictions in
         # a single column.
         meta_feature = [
             self._apply_fitted_base_estimator(
@@ -313,7 +312,7 @@ class BaseStacking(BaseEstimator, ABC):
             ) -> np.ndarray:
         # Collect out-of-fold predictions of all base estimators that are
         # trained on all folds except the one for which predictions are
-        # being made and return matrix of out-of-fold predictions.
+        # being made, then return matrix of out-of-fold predictions.
 
         base_estimators, base_fit_kwargs = (
             self.__prepare_all_for_base_estimators_fitting(base_fit_kwargs)
@@ -339,11 +338,11 @@ class BaseStacking(BaseEstimator, ABC):
             current_meta_x = self.__compute_meta_feature_produced_by_estimator(
                 estimator_fits_to_folds, apply_fn, hold_out_Xs, fit_ys
             )
-            current_meta_x = self.__restore_initial_order(
-                current_meta_x, folds
-            )
             meta_features.append(current_meta_x)
-        meta_X = np.hstack(meta_features)
+        shuffled_meta_X = np.hstack(meta_features)
+        meta_X = self.__restore_initial_order(
+            shuffled_meta_X, folds
+        )
         return meta_X
 
     def _fit_meta_estimator(
@@ -395,8 +394,8 @@ class BaseStacking(BaseEstimator, ABC):
             target
         :param base_fit_kwargs:
             settings of first stage estimators training, first stage
-            estimators are identified by their types, as of now two
-            estimators of the same type can not have different
+            estimators are identified by their types and, as of now,
+            two estimators of the same type can not have different
             settings
         :param meta_fit_kwargs:
             settings of second stage estimator training
