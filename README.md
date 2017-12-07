@@ -1,12 +1,12 @@
 [![Build Status](https://travis-ci.org/Nikolay-Lysenko/dsawl.svg?branch=master)](https://travis-ci.org/Nikolay-Lysenko/dsawl)
 [![codecov](https://codecov.io/gh/Nikolay-Lysenko/dsawl/branch/master/graph/badge.svg)](https://codecov.io/gh/Nikolay-Lysenko/dsawl)
-[![Code Climate](https://codeclimate.com/github/Nikolay-Lysenko/dsawl/badges/gpa.svg)](https://codeclimate.com/github/Nikolay-Lysenko/dsawl)
+[![Maintainability](https://api.codeclimate.com/v1/badges/98fc23b8b51fb20f2920/maintainability)](https://codeclimate.com/github/Nikolay-Lysenko/dsawl/maintainability)
 
 # dsawl
 
 ## What is it?
 This is a set of tools for machine learning. As of now, the list of implemented utilities is as follows:
-* Stacking, a method that applies machine learning algorithm to out-of-fold predictions or transformations made by other machine learning models. More details can be found in [a short demo](https://github.com/Nikolay-Lysenko/dsawl/blob/master/docs/stacking_demo.ipynb).
+* Stacking, a method that applies machine learning algorithm to out-of-fold predictions or transformations made by other machine learning models. Some additional details are explained in [a short demo](https://github.com/Nikolay-Lysenko/dsawl/blob/master/docs/stacking_demo.ipynb).
 * Target encoding, an alternative to one-hot encoding and hashing trick that attempts to have both memory efficiency and incorporation of all useful information from initial features. More details can be found in [a tutorial](https://github.com/Nikolay-Lysenko/dsawl/blob/master/docs/target_encoding_demo.ipynb).
 
 Repository name is a combination of three words: DS, saw, and awl. DS is as an abbreviation for Data Science and the latter two words represent useful tools.
