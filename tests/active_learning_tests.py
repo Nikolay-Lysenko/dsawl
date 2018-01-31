@@ -19,9 +19,10 @@ from dsawl.active_learning.pool_based_sampling import (
     compute_confidences, compute_margins, compute_entropy,
     compute_committee_divergences
 )
+from dsawl.active_learning.utils import make_committee
 
 
-def get_dataset_and_pool() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def get_data_for_classification() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Get dataset with categorical target variable and two features
     and get feature representation of new unlabelled objects.
@@ -52,6 +53,23 @@ def get_dataset_and_pool() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     return X_train, y_train, X_new
 
 
+def get_predictions_of_knn_classifier() -> np.ndarray:
+    """
+    Get predictions of class probabilities made by
+    `KNeighborsClassifier()` trained on data that are returned
+    by `get_dataset_and_pool` function and applied to `X_new` from
+    its output.
+
+    :return:
+        predicted probabilities for new objects
+    """
+    clf = KNeighborsClassifier()
+    X_train, y_train, X_new = get_data_for_classification()
+    clf.fit(X_train, y_train)
+    predicted_probabilities = clf.predict_proba(X_new)
+    return predicted_probabilities
+
+
 class TestRankingFunctions(unittest.TestCase):
     """
     Tests of functions for ranking in pool-based sampling.
@@ -64,10 +82,9 @@ class TestRankingFunctions(unittest.TestCase):
         :return:
             None
         """
-        clf = KNeighborsClassifier()
-        X_train, y_train, X_new = get_dataset_and_pool()
-        execution_result = compute_confidences(clf, X_train, y_train, X_new)
-        true_answer = np.array([0.6, 0.6, 0.4, 0.6, 0.6]).reshape(-1, 1)
+        predicted_probabilities = get_predictions_of_knn_classifier()
+        execution_result = compute_confidences(predicted_probabilities)
+        true_answer = np.array([0.6, 0.6, 0.4, 0.6, 0.6])
         self.assertTrue(np.array_equal(execution_result, true_answer))
 
     def test_compute_margins(self) -> type(None):
@@ -77,10 +94,9 @@ class TestRankingFunctions(unittest.TestCase):
         :return:
             None
         """
-        clf = KNeighborsClassifier()
-        X_train, y_train, X_new = get_dataset_and_pool()
-        execution_result = compute_margins(clf, X_train, y_train, X_new)
-        true_answer = np.array([0.2, 0.2, 0, 0.4, 0.2]).reshape(-1, 1)
+        predicted_probabilities = get_predictions_of_knn_classifier()
+        execution_result = compute_margins(predicted_probabilities)
+        true_answer = np.array([0.2, 0.2, 0, 0.4, 0.2])
         self.assertTrue(np.allclose(execution_result, true_answer))
 
     def test_compute_entropy(self) -> type(None):
@@ -90,16 +106,10 @@ class TestRankingFunctions(unittest.TestCase):
         :return:
             None
         """
-        clf = KNeighborsClassifier()
-        X_train, y_train, X_new = get_dataset_and_pool()
-        clf.fit(X_train, y_train)
-        execution_result = compute_entropy(clf, X_train, y_train, X_new)
+        predicted_probabilities = get_predictions_of_knn_classifier()
+        execution_result = compute_entropy(predicted_probabilities)
         true_answer = np.array(
-            [[0.67301167],
-             [0.67301167],
-             [1.05492017],
-             [0.95027054],
-             [0.67301167]]
+            [0.67301167, 0.67301167, 1.05492017, 0.95027054, 0.67301167]
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
 
@@ -111,18 +121,16 @@ class TestRankingFunctions(unittest.TestCase):
             None
         """
         clf = KNeighborsClassifier()
-        X_train, y_train, X_new = get_dataset_and_pool()
+        X_train, y_train, X_new = get_data_for_classification()
         splitter = StratifiedKFold()
+        committee = make_committee(clf, X_train, y_train, splitter)
+        list_of_predicted_probabilities = [
+            clf.predict_proba(X_new) for clf in committee
+        ]
         execution_result = compute_committee_divergences(
-            clf, X_train, y_train, X_new, splitter
+            list_of_predicted_probabilities
         )
-        true_answer = np.array(
-            [[0],
-             [0],
-             [0],
-             [0.09080533],
-             [0]]
-        )
+        true_answer = np.array([0, 0, 0, 0.09080533, 0])
         self.assertTrue(np.allclose(execution_result, true_answer))
 
 

@@ -26,5 +26,5 @@ setup(
     keywords='machine_learning feature_engineering categorical_features',
     packages=find_packages(exclude=['docs', 'tests']),
     python_requires='>=3.5',
-    install_requires=['numpy', 'pandas', 'scikit-learn', 'joblib']
+    install_requires=['numpy', 'pandas', 'scipy', 'scikit-learn', 'joblib']
 )
