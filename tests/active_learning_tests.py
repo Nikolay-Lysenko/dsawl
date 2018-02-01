@@ -11,7 +11,6 @@ import unittest
 from typing import Tuple
 
 import numpy as np
-
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 
 from dsawl.active_learning.pool_based_sampling import (
@@ -19,7 +18,8 @@ from dsawl.active_learning.pool_based_sampling import (
     compute_committee_divergences, compute_committee_variances,
     compute_estimations_of_variance,
     UncertaintyScorerForClassification, CommitteeScorer,
-    VarianceScorerForRegression
+    VarianceScorerForRegression,
+    EpsilonGreedyPickerFromPool
 )
 
 
@@ -159,6 +159,28 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
         another_predictions = another_clf.predict(X_new)
         self.assertTrue(np.array_equal(predictions, another_predictions))
 
+    def test_update_tools(self) -> type(None):
+        """
+        Test that `update_tools` method works correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        clf = KNeighborsClassifier()
+        scorer = UncertaintyScorerForClassification(
+            compute_entropy,
+            clf=clf
+        )
+        scorer.update_tools(X_train, y_train)
+        execution_result = scorer.clf.predict(X_new)
+        true_answer = np.array([2, 3, 2, 1, 1])
+        self.assertTrue(np.array_equal(execution_result, true_answer))
+        scorer.update_tools(X_train[:-1, :], y_train[:-1], clf)
+        execution_result = scorer.clf.predict(X_new)
+        true_answer = np.array([2, 1, 2, 1, 1])
+        self.assertTrue(np.array_equal(execution_result, true_answer))
+
 
 class TestCommitteeScorer(unittest.TestCase):
     """
@@ -223,6 +245,34 @@ class TestCommitteeScorer(unittest.TestCase):
         another_predictions = another_clf.predict(X_new)
         self.assertTrue(np.array_equal(predictions, another_predictions))
 
+    def test_update_tools(self) -> type(None):
+        """
+        Test that `update_tools` method works correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        clf = KNeighborsClassifier()
+        scorer = CommitteeScorer(
+            compute_entropy,
+            committee=[clf]
+        )
+        scorer.update_tools(X_train, y_train)
+        execution_result = [clf.predict(X_new) for clf in scorer.committee]
+        true_answer = [np.array([1, 1, 2, 1, 1]) for _ in range(3)]
+        for result, answer in zip(execution_result, true_answer):
+            self.assertTrue(np.array_equal(result, answer))
+        scorer.update_tools(
+            np.vstack((X_train, X_train[1, :])),
+            np.hstack((y_train, y_train[1])),
+            clf
+        )
+        execution_result = [clf.predict(X_new) for clf in scorer.committee]
+        true_answer = [np.array([1, 1, 2, 1, 1]) for _ in range(3)]
+        for result, answer in zip(execution_result, true_answer):
+            self.assertTrue(np.array_equal(result, answer))
+
 
 class TestVarianceScorerForRegression(unittest.TestCase):
     """
@@ -273,6 +323,78 @@ class TestVarianceScorerForRegression(unittest.TestCase):
         another_predictions = another_rgrs['target'].predict(X_new)
         self.assertTrue(np.array_equal(predictions, another_predictions))
 
+    def test_update_tools(self) -> type(None):
+        """
+        Test that `update_tools` method works correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        rgrs = {
+            'target': KNeighborsRegressor(),
+            'target^2': KNeighborsRegressor()
+        }
+        scorer = VarianceScorerForRegression(
+            compute_entropy,
+            rgrs=rgrs
+        )
+        scorer.update_tools(X_train, y_train)
+        execution_result = scorer.rgrs['target'].predict(X_new)
+        true_answer = np.array([1.6, 2.2, 2.2, 1.6, 1.4])
+        self.assertTrue(np.array_equal(execution_result, true_answer))
+        scorer.update_tools(
+            X_train[:-1, :], y_train[:-1], KNeighborsRegressor()
+        )
+        execution_result = scorer.rgrs['target'].predict(X_new)
+        true_answer = np.array([1.6, 1.8, 2.4, 1.6, 1.4])
+        self.assertTrue(np.array_equal(execution_result, true_answer))
+
+
+class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
+    """
+    Tests of `EpsilonGreedyPickerFromPool` class.
+    """
+
+    def test_pick_new_objects_with_zero_exploration(self) -> type(None):
+        """
+        Test that `pick_new_objects` method works correctly
+        when there are no exploration.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        clf = KNeighborsClassifier()
+        clf.fit(X_train, y_train)
+        scorer = UncertaintyScorerForClassification(
+            compute_confidences, revert_sign=True, clf=clf
+        )
+        picker = EpsilonGreedyPickerFromPool(scorer, exploration_probability=0)
+        execution_result = picker.pick_new_objects(X_new)
+        true_answer = [2]
+        self.assertTrue(execution_result == true_answer)
+
+    def test_pick_new_objects_with_full_exploration(self) -> type(None):
+        """
+        Test that `pick_new_objects` method works correctly
+        when there are no exploitation.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        clf = KNeighborsClassifier()
+        clf.fit(X_train, y_train)
+        scorer = UncertaintyScorerForClassification(
+            compute_confidences, revert_sign=True, clf=clf
+        )
+        picker = EpsilonGreedyPickerFromPool(scorer, exploration_probability=1)
+        picked_indices = picker.pick_new_objects(X_new, n_to_pick=2)
+        self.assertTrue(len(picked_indices) == 2)
+        for index in picked_indices:
+            self.assertTrue(0 <= index < len(X_new))
+
 
 def main():
     test_loader = unittest.TestLoader()
@@ -280,7 +402,8 @@ def main():
     testers = [
         TestUncertaintyScorerForClassification(),
         TestCommitteeScorer(),
-        TestVarianceScorerForRegression()
+        TestVarianceScorerForRegression(),
+        TestEpsilonGreedyPickerFromPool()
     ]
     for tester in testers:
         suite = test_loader.loadTestsFromModule(tester)
