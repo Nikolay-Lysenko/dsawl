@@ -12,16 +12,18 @@ and disclosed.
 """
 
 
-from typing import List, Union, Callable, Optional
+from typing import List, Dict, Union, Callable, Optional
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 import numpy as np
 import scipy
-
 from sklearn.base import BaseEstimator, clone
 
 from .utils import make_committee
 
+
+# Scoring functions.
 
 def compute_confidences(predicted_probabilities: np.ndarray) -> np.ndarray:
     """
@@ -115,7 +117,10 @@ def compute_committee_variances(
     :return:
         variance of predictions for each new object
     """
-    variances = np.var(list_of_predictions, axis=1)
+    all_predictions = np.hstack(
+        [np.array(x).reshape(-1, 1) for x in list_of_predictions]
+    )
+    variances = np.var(all_predictions, axis=1)
     return variances
 
 
@@ -136,9 +141,11 @@ def compute_estimations_of_variance(
         estimations of variance
     """
     estimations_of_variance = predictions_of_square - predictions ** 2
-    estimations_of_variance = np.max(estimations_of_variance, 0)
+    estimations_of_variance = np.maximum(estimations_of_variance, 0)
     return estimations_of_variance
 
+
+# Scorers.
 
 class BaseScorer(ABC):
     """
@@ -152,7 +159,7 @@ class BaseScorer(ABC):
         `False` if the most important object has the highest score
         and `True` else
     :param is_classification:
-        `True` if it is classification or `False` else
+        `True` if classification problem is studied and `False` else
     """
 
     def __init__(
@@ -165,29 +172,27 @@ class BaseScorer(ABC):
         self.revert_sign = revert_sign
         self.is_classification = is_classification
 
-    @staticmethod
-    def _validate_inputs(
-            X_train: Optional[np.ndarray], y_train: Optional[np.ndarray]
+    @abstractmethod
+    def set_tools(
+            self,
+            tools: Union[
+                BaseEstimator, List[BaseEstimator], Dict[str, BaseEstimator]
+            ]
             ) -> type(None):
-        if X_train is None:
-            raise ValueError(
-                "`X_train` must be passed if `skip_training` == `False`"
-            )
-        if y_train is None:
-            raise ValueError(
-                "`y_train` must be passed if `skip_training` == `False`"
-            )
+        pass
 
     @abstractmethod
-    def score(
+    def update_tools(
             self,
-            est: BaseEstimator,
-            X_new: np.ndarray,
-            skip_training: bool = False,
-            X_train: Optional[np.ndarray] = None,
-            y_train: Optional[np.ndarray] = None,
+            X_train: np.ndarray,
+            y_train: np.ndarray,
+            est: Optional[BaseEstimator] = None,
             *args, **kwargs
-            ) -> np.ndarray:
+            ) -> type(None):
+        pass
+
+    @abstractmethod
+    def score(self, X_new: np.ndarray) -> np.ndarray:
         pass
 
 
@@ -198,41 +203,89 @@ class UncertaintyScorerForClassification(BaseScorer):
     * `compute_confidences`,
     * `compute_margins`,
     * `compute_entropy`.
+
+    :param scoring_fn:
+        function for scoring objects
+    :param revert_sign:
+        `False` if the most important object has the highest score
+        and `True` else
+    :param clf:
+        classifier that has methods `fit` and `predict_proba`,
+        it becomes internal classifier of the scorer
     """
 
-    def __init__(self, scoring_fn: Callable, revert_sign: bool = False):
-        super().__init__(scoring_fn, revert_sign, is_classification=True)
-
-    def score(
+    def __init__(
             self,
-            est: BaseEstimator,
-            X_new: np.ndarray,
-            skip_training: bool = False,
-            X_train: Optional[np.ndarray] = None,
-            y_train: Optional[np.ndarray] = None,
-            *args, **kwargs
-            ) -> np.ndarray:
-        """
-        Score objects with the highest score standing for the most
-        important object.
+            scoring_fn: Callable,
+            revert_sign: bool = False,
+            clf: Optional[BaseEstimator] = None,
+            ):
+        super().__init__(scoring_fn, revert_sign, is_classification=True)
+        self.clf = clf
 
-        :param est:
+    def __check_classifier(self) -> type(None):
+        # Check that classifier is passed and has proper methods.
+        if self.clf is None:
+            raise RuntimeError("Classifier must be passed before scoring.")
+        if getattr(self.clf, 'predict_proba', None) is None:
+            raise ValueError("Classifier must have `predict_proba` method.")
+
+    def set_tools(self, tools: BaseEstimator) -> type(None):
+        """
+        Replace internal classifier with passed instance.
+
+        :param tools:
             classifier that has methods `fit` and `predict_proba`
-        :param X_new:
-            feature representation of new objects
-        :param skip_training:
-            `True` if `est` has been fitted already and `False` else
+        :return:
+            None
+        """
+        self.clf = tools
+
+    def update_tools(
+            self,
+            X_train: np.ndarray,
+            y_train: np.ndarray,
+            est: Optional[BaseEstimator] = None,
+            *args, **kwargs
+            ) -> type(None):
+        """
+        Fit internal classifier to passed training data and,
+        optionally, before that replace classifier with a new
+        instance.
+
         :param X_train:
             feature representation of training objects
         :param y_train:
-            target label
+            target labels
+        :param est:
+            classifier that has methods `fit` and `predict_proba`;
+            if it is passed, its fitted instance becomes internal
+            classifier
+        :return:
+            None
+        """
+        if est is None and self.clf is not None:
+            self.clf.fit(X_train, y_train)
+        elif est is None and self.clf is None:
+            raise RuntimeError(
+                "Classifier is not passed neither to initialization "
+                "nor to this function."
+            )
+        else:
+            self.clf = est.fit(X_train, y_train)
+
+    def score(self, X_new: np.ndarray) -> np.ndarray:
+        """
+        Score new objects with the highest score standing for the most
+        important object.
+
+        :param X_new:
+            feature representation of new objects
         :return:
             uncertainty scores computed with `self.scoring_fn`
         """
-        if not skip_training:
-            self._validate_inputs(X_train, y_train)
-            est.fit(X_train, y_train)
-        predicted_probabilities = est.predict_proba(X_new)
+        self.__check_classifier()
+        predicted_probabilities = self.clf.predict_proba(X_new)
         scores = self.scoring_fn(predicted_probabilities)
         if self.revert_sign:
             scores = -scores
@@ -245,51 +298,107 @@ class CommitteeScorer(BaseScorer):
     in predictions of committee members. Examples of such functions:
     * `compute_committee_divergences`,
     * `compute_committee_variances`.
+
+    :param scoring_fn:
+        function for scoring objects
+    :param revert_sign:
+        `False` if the most important object has the highest score
+        and `True` else
+    :param is_classification:
+        `True` if it is classification or `False` if it is regression
+    :param committee:
+        list of instances of the same class fitted to different folds,
+        instances must have `predict_proba` method if it is
+        classification or `predict` method if it is regression
     """
 
-    def score(
+    def __init__(
             self,
-            est: Union[BaseEstimator, List[BaseEstimator]],
-            X_new: np.ndarray,
-            skip_training: bool = False,
-            X_train: Optional[np.ndarray] = None,
-            y_train: Optional[np.ndarray] = None,
-            *args, **kwargs
-            ) -> np.ndarray:
-        """
-        Score objects with the highest score standing for the most
-        important object.
+            scoring_fn: Callable,
+            revert_sign: bool = False,
+            is_classification: bool = True,
+            committee: Optional[List[BaseEstimator]] = None,
+            ):
+        super().__init__(scoring_fn, revert_sign, is_classification)
+        self.committee = committee
 
-        :param est:
-            estimator if `skip_training` is set to `False` and list of
-            already fitted estimators else; method `fit` must be present,
-            also method `predict_proba` must be present if it is
-            classifier(s) and method `predict` must be present if it is
-            regressor(s)
-        :param X_new:
-            feature representation of new objects
-        :param skip_training:
-            `True` if `est` is a committee of fitted estimators and
-            `False` else
+    def __check_committee(self) -> type(None):
+        # Check that committee is not empty.
+        if self.committee is None:
+            raise RuntimeError("Committee must be provided before scoring.")
+        if len(self.committee) == 0:
+            raise RuntimeError("Committee has zero length.")
+
+    def set_tools(self, tools: List[BaseEstimator]) -> type(None):
+        """
+        Replace internal committee with passed list of estimators.
+
+        :param tools:
+            list of instances of the same class fitted to different
+            folds, instances must have `predict_proba` method if it
+            is classification or `predict` method if it is regression
+        :return:
+            None
+        """
+        self.committee = tools
+
+    def update_tools(
+            self,
+            X_train: np.ndarray,
+            y_train: np.ndarray,
+            est: Optional[BaseEstimator] = None,
+            *args, **kwargs
+            ) -> type(None):
+        """
+        Fit internal committee to passed training data and,
+        optionally, before that replace members of the committee
+        with new instances.
+
         :param X_train:
             feature representation of training objects
         :param y_train:
             target
+        :param est:
+            estimator that has method `fit`, also it must have method
+            `predict_proba` if it is a classifier or it must have
+            method `predict` if it is a regressor; if it is passed,
+            its clones become members of the committee instead of
+            previous members
+        :return:
+            None
+        """
+        if est is None and self.committee is not None:
+            self.committee = make_committee(
+                self.committee[0], X_train, y_train, *args, **kwargs
+            )
+        elif est is None and self.committee is None:
+            raise RuntimeError(
+                "Committee is not passed neither to initialization "
+                "nor to this function."
+            )
+        else:
+            self.committee = make_committee(
+                est, X_train, y_train, *args, **kwargs
+            )
+
+    def score(self, X_new: np.ndarray) -> np.ndarray:
+        """
+        Score new objects with the highest score standing for the most
+        important object.
+
+        :param X_new:
+            feature representation of new objects
         :return:
             discrepancy scores computed with `self.scoring_fn`
         """
-        if not skip_training:
-            self._validate_inputs(X_train, y_train)
-            committee = make_committee(est, X_train, y_train, *args, **kwargs)
-        else:
-            committee = est
+        self.__check_committee()
         if self.is_classification:
             list_of_predictions = [
-                est.predict_proba(X_new) for est in committee
+                est.predict_proba(X_new) for est in self.committee
             ]
         else:
             list_of_predictions = [
-                est.predict(X_new) for est in committee
+                est.predict(X_new) for est in self.committee
             ]
         scores = self.scoring_fn(list_of_predictions)
         if self.revert_sign:
@@ -302,50 +411,184 @@ class VarianceScorerForRegression(BaseScorer):
     A scorer working with functions that measure estimated variance.
     Examples of such functions:
     * `compute_estimations_of_variance`.
+
+    :param scoring_fn:
+        function for scoring objects
+    :param rgrs:
+        dict with keys 'target' and 'target^2' and values that
+        are regressors predicting target variable and squared
+        target variable respectively, these regressors must
+        have method `predict` for doing so
     """
 
-    def __init__(self, scoring_fn: Callable):
+    def __init__(
+            self,
+            scoring_fn: Callable,
+            rgrs: Optional[Dict[str, BaseEstimator]] = None
+            ):
         super().__init__(
             scoring_fn, revert_sign=False, is_classification=False
         )
+        self.rgrs = rgrs
 
-    def score(
-            self,
-            est: BaseEstimator,
-            X_new: np.ndarray,
-            skip_training: bool = False,
-            X_train: Optional[np.ndarray] = None,
-            y_train: Optional[np.ndarray] = None,
-            *args, **kwargs
-            ) -> np.ndarray:
+    def __check_regressors(self) -> type(None):
+        # Check that regressors are passed and have proper methods.
+        if self.rgrs is None:
+            raise RuntimeError("Regressors must be passed before scoring.")
+        if getattr(self.rgrs['target'], 'predict', None) is None:
+            raise ValueError("Regressor must have `predict` method.")
+        if getattr(self.rgrs['target^2'], 'predict', None) is None:
+            raise ValueError("Regressor must have `predict` method.")
+
+    def set_tools(self, tools: Dict[str, BaseEstimator]) -> type(None):
         """
-        Score objects with the highest score standing for the most
-        important object.
+        Replace internal regressors with passed regressors.
 
-        :param est:
-            regressor that has methods `fit` and `predict`, it must be
-            already fitted if at least `X_train` or `y_train` is not
-            passed
-        :param X_new:
-            feature representation of new objects
-        :param skip_training:
-            `True` if `est` is has been fitted already and `False` else,
-            training of squared target prediction is not affected by
-            this argument
+        :param tools:
+            dict with keys 'target' and 'target^2' and values that
+            are regressors predicting target variable and squared
+            target variable respectively, these regressors must
+            have method `predict` for doing so
+        :return:
+            None
+        """
+        self.rgrs = tools
+
+    def update_tools(
+            self,
+            X_train: np.ndarray,
+            y_train: np.ndarray,
+            est: Optional[BaseEstimator] = None,
+            *args, **kwargs
+            ) -> type(None):
+        """
+        Fit pair of regressors to passed training data and,
+        optionally, before that replace these regressors with new
+        instances.
+
         :param X_train:
             feature representation of training objects
         :param y_train:
             target variable
+        :param est:
+            regressor that has methods `fit` and `predict`; if it
+            is passed, it and its clone form a new pair of regressors
+        :return:
+            None
+        """
+        if est is None and self.rgrs is not None:
+            self.rgrs = {
+                'target': self.rgrs['target'].fit(X_train, y_train),
+                'target^2': self.rgrs['target^2'].fit(X_train, y_train ** 2)
+            }
+        elif est is None and self.rgrs is None:
+            raise RuntimeError(
+                "Regressors is not passed neither to initialization "
+                "nor to this function."
+            )
+        else:
+            self.rgrs = {
+                'target': est.fit(X_train, y_train),
+                'target^2': clone(est).fit(X_train, y_train ** 2)
+            }
+
+    def score(self, X_new: np.ndarray) -> np.ndarray:
+        """
+        Score new objects with the highest score standing for the most
+        important object.
+
+        :param X_new:
+            feature representation of new objects
         :return:
             estimates of variance computed with `self.scoring_fn`
         """
-        if X_train is None or y_train is None:
-            raise ValueError("Both `X_train` and `y_train` must be passed")
-        if not skip_training:
-            est.fit(X_train, y_train)
-        predictions = est.predict(X_new)
-        second_est = clone(est)
-        second_est.fit(X_train, y_train ** 2)
-        predictions_of_square = second_est.predict(X_new)
+        predictions = self.rgrs['target'].predict(X_new)
+        predictions_of_square = self.rgrs['target^2'].predict(X_new)
         scores = self.scoring_fn(predictions, predictions_of_square)
         return scores
+
+
+# Active learning strategies.
+
+class EpsilonGreedyPickerFromPool:
+    """
+    This class is for picking a random object with a specified
+    probability (so called epsilon) or picking object near the
+    decision boundary else.
+
+    :param scorer:
+        scorer for ranking new objects, it also can be one
+        of these strings: 'confidence', 'margin', 'entropy',
+        'divergence', 'predictions_variance', 'target_variance'
+    :param exploration_probability:
+        probability of picking objects at random
+    """
+
+    def __init__(
+            self,
+            scorer: Union[str, BaseScorer],
+            exploration_probability: float = 0.1
+            ):
+        str_to_scorer = defaultdict(
+            lambda x: scorer,
+            confidence=UncertaintyScorerForClassification(
+                compute_confidences, revert_sign=True
+            ),
+            margin=UncertaintyScorerForClassification(
+                compute_margins, revert_sign=True
+            ),
+            entropy=UncertaintyScorerForClassification(
+                compute_entropy
+            ),
+            divergence=CommitteeScorer(
+                compute_committee_divergences
+            ),
+            predictions_variance=CommitteeScorer(
+                compute_committee_variances, is_classification=False
+            ),
+            target_variance=VarianceScorerForRegression(
+                compute_estimations_of_variance
+            )
+        )
+        scorer = str_to_scorer[scorer]
+        self.scorer = scorer
+        self.exploration_probability = exploration_probability
+        self.n_to_pick = None
+
+    def __exploit(self, X_new: np.ndarray) -> List[int]:
+        # Exploit existing knowledge, i.e., pick objects near the current
+        # decision boundary and return their indices.
+        scores = self.scorer.score(X_new)
+        picked_indices = scores.argsort()[:self.n_to_pick]
+        return picked_indices
+
+    def __explore(self, n_of_new_objects: int) -> List[int]:
+        # Pick objects at random.
+        all_indices = np.array(range(n_of_new_objects))
+        picked_indices = np.random.choice(
+            all_indices, size=self.n_to_pick, replace=False
+        )
+        return picked_indices
+
+    def pick_new_objects(
+            self,
+            X_new: np.ndarray,
+            n_to_pick: int = 1
+            ) -> List[int]:
+        """
+        Select objects from a fixed pool of objects.
+
+        :param X_new:
+            feature representation of new objects
+        :param n_to_pick:
+            number of objects to pick
+        :return:
+            indices of the most important object
+        """
+        self.n_to_pick = n_to_pick
+        outcome = np.random.uniform()
+        if outcome > self.exploration_probability:
+            picked_indices = self.__exploit(X_new)
+        else:
+            picked_indices = self.__explore(X_new.shape[0])
+        return picked_indices
