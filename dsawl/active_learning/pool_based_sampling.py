@@ -1,12 +1,13 @@
 """
-This module consists of highly-modular tools for pool-based approach
-to active learning. Active learning setup assumes that, given a model
-and a training set, it is possible to extend the training set with
-new labelled examples and the goal is to do it with maximum possible
-improvement of model quality. Further, pool-bases sampling means that
-new examples come from a fixed and known set of initially unlabelled
-examples, i.e., the task is to choose which labels should be explored
-and disclosed.
+This file contains highly-modular tools for pool-based approach
+to active learning.
+
+Active learning setup assumes that, given a model and a training set,
+it is possible to extend the training set with new labelled examples
+and the goal is to do it with maximum possible improvement of model
+quality. Further, pool-bases sampling means that new examples come from
+a fixed and known set of initially unlabelled examples, i.e., the task
+is to choose which labels should be explored and disclosed.
 
 @author: Nikolay Lysenko
 """
@@ -402,7 +403,7 @@ class CommitteeScorer(BaseScorer):
             ]
         scores = self.scoring_fn(list_of_predictions)
         if self.revert_sign:
-            scores = -scores
+            scores = -scores  # pragma: no cover
         return scores
 
 
@@ -502,6 +503,7 @@ class VarianceScorerForRegression(BaseScorer):
         :return:
             estimates of variance computed with `self.scoring_fn`
         """
+        self.__check_regressors()
         predictions = self.rgrs['target'].predict(X_new)
         predictions_of_square = self.rgrs['target^2'].predict(X_new)
         scores = self.scoring_fn(predictions, predictions_of_square)
@@ -530,7 +532,7 @@ class EpsilonGreedyPickerFromPool:
             exploration_probability: float = 0.1
             ):
         str_to_scorer = defaultdict(
-            lambda x: scorer,
+            lambda: scorer,
             confidence=UncertaintyScorerForClassification(
                 compute_confidences, revert_sign=True
             ),
@@ -559,7 +561,7 @@ class EpsilonGreedyPickerFromPool:
         # Exploit existing knowledge, i.e., pick objects near the current
         # decision boundary and return their indices.
         scores = self.scorer.score(X_new)
-        picked_indices = scores.argsort()[:self.n_to_pick]
+        picked_indices = scores.argsort()[-self.n_to_pick:].tolist()
         return picked_indices
 
     def __explore(self, n_of_new_objects: int) -> List[int]:
