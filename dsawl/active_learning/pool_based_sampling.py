@@ -24,6 +24,9 @@ from sklearn.base import BaseEstimator, clone
 from .utils import make_committee
 
 
+ToolsType = Union[BaseEstimator, List[BaseEstimator], Dict[str, BaseEstimator]]
+
+
 # Scoring functions.
 
 def compute_confidences(predicted_probabilities: np.ndarray) -> np.ndarray:
@@ -169,17 +172,16 @@ class BaseScorer(ABC):
             revert_sign: bool = False,
             is_classification: bool = True
             ):
-        self.scoring_fn = scoring_fn
-        self.revert_sign = revert_sign
-        self.is_classification = is_classification
+        self._scoring_fn = scoring_fn
+        self._revert_sign = revert_sign
+        self._is_classification = is_classification
 
     @abstractmethod
-    def set_tools(
-            self,
-            tools: Union[
-                BaseEstimator, List[BaseEstimator], Dict[str, BaseEstimator]
-            ]
-            ) -> type(None):
+    def get_tools(self) -> ToolsType:
+        pass
+
+    @abstractmethod
+    def set_tools(self, tools: ToolsType) -> type(None):
         pass
 
     @abstractmethod
@@ -222,14 +224,23 @@ class UncertaintyScorerForClassification(BaseScorer):
             clf: Optional[BaseEstimator] = None,
             ):
         super().__init__(scoring_fn, revert_sign, is_classification=True)
-        self.clf = clf
+        self.__clf = clf
 
     def __check_classifier(self) -> type(None):
         # Check that classifier is passed and has proper methods.
-        if self.clf is None:
+        if self.__clf is None:
             raise RuntimeError("Classifier must be passed before scoring.")
-        if getattr(self.clf, 'predict_proba', None) is None:
+        if getattr(self.__clf, 'predict_proba', None) is None:
             raise ValueError("Classifier must have `predict_proba` method.")
+
+    def get_tools(self) -> BaseEstimator:
+        """
+        Get internal classifier.
+
+        :return:
+            internal classifier
+        """
+        return self.__clf
 
     def set_tools(self, tools: BaseEstimator) -> type(None):
         """
@@ -240,7 +251,7 @@ class UncertaintyScorerForClassification(BaseScorer):
         :return:
             None
         """
-        self.clf = tools
+        self.__clf = tools
 
     def update_tools(
             self,
@@ -265,15 +276,15 @@ class UncertaintyScorerForClassification(BaseScorer):
         :return:
             None
         """
-        if est is None and self.clf is not None:
-            self.clf.fit(X_train, y_train)
-        elif est is None and self.clf is None:
+        if est is None and self.__clf is not None:
+            self.__clf.fit(X_train, y_train)
+        elif est is None and self.__clf is None:
             raise RuntimeError(
                 "Classifier is not passed neither to initialization "
                 "nor to this function."
             )
         else:
-            self.clf = est.fit(X_train, y_train)
+            self.__clf = est.fit(X_train, y_train)
 
     def score(self, X_new: np.ndarray) -> np.ndarray:
         """
@@ -286,9 +297,9 @@ class UncertaintyScorerForClassification(BaseScorer):
             uncertainty scores computed with `self.scoring_fn`
         """
         self.__check_classifier()
-        predicted_probabilities = self.clf.predict_proba(X_new)
-        scores = self.scoring_fn(predicted_probabilities)
-        if self.revert_sign:
+        predicted_probabilities = self.__clf.predict_proba(X_new)
+        scores = self._scoring_fn(predicted_probabilities)
+        if self._revert_sign:
             scores = -scores
         return scores
 
@@ -321,14 +332,23 @@ class CommitteeScorer(BaseScorer):
             committee: Optional[List[BaseEstimator]] = None,
             ):
         super().__init__(scoring_fn, revert_sign, is_classification)
-        self.committee = committee
+        self.__committee = committee
 
     def __check_committee(self) -> type(None):
         # Check that committee is not empty.
-        if self.committee is None:
+        if self.__committee is None:
             raise RuntimeError("Committee must be provided before scoring.")
-        if len(self.committee) == 0:
+        if len(self.__committee) == 0:
             raise RuntimeError("Committee has zero length.")
+
+    def get_tools(self) -> List[BaseEstimator]:
+        """
+        Get internal committee of estimators.
+
+        :return:
+            None
+        """
+        return self.__committee
 
     def set_tools(self, tools: List[BaseEstimator]) -> type(None):
         """
@@ -341,7 +361,7 @@ class CommitteeScorer(BaseScorer):
         :return:
             None
         """
-        self.committee = tools
+        self.__committee = tools
 
     def update_tools(
             self,
@@ -368,17 +388,17 @@ class CommitteeScorer(BaseScorer):
         :return:
             None
         """
-        if est is None and self.committee is not None:
-            self.committee = make_committee(
-                self.committee[0], X_train, y_train, *args, **kwargs
+        if est is None and self.__committee is not None:
+            self.__committee = make_committee(
+                self.__committee[0], X_train, y_train, *args, **kwargs
             )
-        elif est is None and self.committee is None:
+        elif est is None and self.__committee is None:
             raise RuntimeError(
                 "Committee is not passed neither to initialization "
                 "nor to this function."
             )
         else:
-            self.committee = make_committee(
+            self.__committee = make_committee(
                 est, X_train, y_train, *args, **kwargs
             )
 
@@ -393,16 +413,16 @@ class CommitteeScorer(BaseScorer):
             discrepancy scores computed with `self.scoring_fn`
         """
         self.__check_committee()
-        if self.is_classification:
+        if self._is_classification:
             list_of_predictions = [
-                est.predict_proba(X_new) for est in self.committee
+                est.predict_proba(X_new) for est in self.__committee
             ]
         else:
             list_of_predictions = [
-                est.predict(X_new) for est in self.committee
+                est.predict(X_new) for est in self.__committee
             ]
-        scores = self.scoring_fn(list_of_predictions)
-        if self.revert_sign:
+        scores = self._scoring_fn(list_of_predictions)
+        if self._revert_sign:
             scores = -scores  # pragma: no cover
         return scores
 
@@ -430,16 +450,25 @@ class VarianceScorerForRegression(BaseScorer):
         super().__init__(
             scoring_fn, revert_sign=False, is_classification=False
         )
-        self.rgrs = rgrs
+        self.__rgrs = rgrs
 
     def __check_regressors(self) -> type(None):
         # Check that regressors are passed and have proper methods.
-        if self.rgrs is None:
+        if self.__rgrs is None:
             raise RuntimeError("Regressors must be passed before scoring.")
-        if getattr(self.rgrs['target'], 'predict', None) is None:
+        if getattr(self.__rgrs['target'], 'predict', None) is None:
             raise ValueError("Regressor must have `predict` method.")
-        if getattr(self.rgrs['target^2'], 'predict', None) is None:
+        if getattr(self.__rgrs['target^2'], 'predict', None) is None:
             raise ValueError("Regressor must have `predict` method.")
+
+    def get_tools(self) -> Dict[str, BaseEstimator]:
+        """
+        Get internal pair of regressors.
+
+        :return:
+            internal pair of regressors
+        """
+        return self.__rgrs
 
     def set_tools(self, tools: Dict[str, BaseEstimator]) -> type(None):
         """
@@ -453,7 +482,7 @@ class VarianceScorerForRegression(BaseScorer):
         :return:
             None
         """
-        self.rgrs = tools
+        self.__rgrs = tools
 
     def update_tools(
             self,
@@ -477,18 +506,18 @@ class VarianceScorerForRegression(BaseScorer):
         :return:
             None
         """
-        if est is None and self.rgrs is not None:
-            self.rgrs = {
-                'target': self.rgrs['target'].fit(X_train, y_train),
-                'target^2': self.rgrs['target^2'].fit(X_train, y_train ** 2)
+        if est is None and self.__rgrs is not None:
+            self.__rgrs = {
+                'target': self.__rgrs['target'].fit(X_train, y_train),
+                'target^2': self.__rgrs['target^2'].fit(X_train, y_train ** 2)
             }
-        elif est is None and self.rgrs is None:
+        elif est is None and self.__rgrs is None:
             raise RuntimeError(
                 "Regressors is not passed neither to initialization "
                 "nor to this function."
             )
         else:
-            self.rgrs = {
+            self.__rgrs = {
                 'target': est.fit(X_train, y_train),
                 'target^2': clone(est).fit(X_train, y_train ** 2)
             }
@@ -504,9 +533,9 @@ class VarianceScorerForRegression(BaseScorer):
             estimates of variance computed with `self.scoring_fn`
         """
         self.__check_regressors()
-        predictions = self.rgrs['target'].predict(X_new)
-        predictions_of_square = self.rgrs['target^2'].predict(X_new)
-        scores = self.scoring_fn(predictions, predictions_of_square)
+        predictions = self.__rgrs['target'].predict(X_new)
+        predictions_of_square = self.__rgrs['target^2'].predict(X_new)
+        scores = self._scoring_fn(predictions, predictions_of_square)
         return scores
 
 
@@ -553,14 +582,14 @@ class EpsilonGreedyPickerFromPool:
             )
         )
         scorer = str_to_scorer[scorer]
-        self.scorer = scorer
-        self.exploration_probability = exploration_probability
+        self.__scorer = scorer
+        self.__exploration_probability = exploration_probability
         self.n_to_pick = None
 
     def __exploit(self, X_new: np.ndarray) -> List[int]:
         # Exploit existing knowledge, i.e., pick objects near the current
         # decision boundary and return their indices.
-        scores = self.scorer.score(X_new)
+        scores = self.__scorer.score(X_new)
         picked_indices = scores.argsort()[-self.n_to_pick:].tolist()
         return picked_indices
 
@@ -589,8 +618,55 @@ class EpsilonGreedyPickerFromPool:
         """
         self.n_to_pick = n_to_pick
         outcome = np.random.uniform()
-        if outcome > self.exploration_probability:
+        if outcome > self.__exploration_probability:
             picked_indices = self.__exploit(X_new)
         else:
             picked_indices = self.__explore(X_new.shape[0])
         return picked_indices
+
+    def get_tools(self) -> ToolsType:
+        """
+        Get estimator or ensemble of estimators such that it is used
+        for scoring new objects by usefulness of their labels.
+
+        :return:
+            internal tools of `self.__scorer`
+        """
+        return self.__scorer.get_tools()
+
+    def set_tools(self, tools: ToolsType) -> type(None):
+        """
+        Replace internal tools of scorer with the passed tools.
+
+        :param tools:
+            new internal tools of scorer
+        :return:
+            None
+        """
+        self.__scorer.set_tools(tools)
+
+    def update_tools(
+            self,
+            X_train: np.ndarray,
+            y_train: np.ndarray,
+            est: Optional[BaseEstimator] = None,
+            *args, **kwargs
+            ) -> type(None):
+        """
+        Fit internal tools of scorer to passed training data and,
+        optionally, before that replace these tools with a new ones
+        based on the passed instance of `est`.
+
+        :param X_train:
+            feature representation of training objects
+        :param y_train:
+            target labels
+        :param est:
+            instance such that new tools are based on it (e.g..,
+            if `self.__scorer` is instance of `CommitteeScorer`,
+            committee of `est` clones fitted to different folds
+            becomes a tools of `self.__scorer`)
+        :return:
+            None
+        """
+        self.__scorer.update_tools(X_train, y_train, est, *args, **kwargs)

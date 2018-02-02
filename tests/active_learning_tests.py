@@ -155,7 +155,7 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
         another_clf = KNeighborsClassifier()
         another_clf.fit(X_train[:-1, :], y_train[:-1])
         scorer.set_tools(another_clf)
-        predictions = scorer.clf.predict(X_new)
+        predictions = scorer.get_tools().predict(X_new)
         another_predictions = another_clf.predict(X_new)
         self.assertTrue(np.array_equal(predictions, another_predictions))
 
@@ -173,11 +173,11 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
             clf=clf
         )
         scorer.update_tools(X_train, y_train)
-        execution_result = scorer.clf.predict(X_new)
+        execution_result = scorer.get_tools().predict(X_new)
         true_answer = np.array([2, 3, 2, 1, 1])
         self.assertTrue(np.array_equal(execution_result, true_answer))
         scorer.update_tools(X_train[:-1, :], y_train[:-1], clf)
-        execution_result = scorer.clf.predict(X_new)
+        execution_result = scorer.get_tools().predict(X_new)
         true_answer = np.array([2, 1, 2, 1, 1])
         self.assertTrue(np.array_equal(execution_result, true_answer))
 
@@ -241,7 +241,7 @@ class TestCommitteeScorer(unittest.TestCase):
         another_clf = KNeighborsClassifier()
         another_clf.fit(X_train[:-1, :], y_train[:-1])
         scorer.set_tools([another_clf])
-        predictions = scorer.committee[0].predict(X_new)
+        predictions = scorer.get_tools()[0].predict(X_new)
         another_predictions = another_clf.predict(X_new)
         self.assertTrue(np.array_equal(predictions, another_predictions))
 
@@ -259,7 +259,7 @@ class TestCommitteeScorer(unittest.TestCase):
             committee=[clf]
         )
         scorer.update_tools(X_train, y_train)
-        execution_result = [clf.predict(X_new) for clf in scorer.committee]
+        execution_result = [clf.predict(X_new) for clf in scorer.get_tools()]
         true_answer = [np.array([1, 1, 2, 1, 1]) for _ in range(3)]
         for result, answer in zip(execution_result, true_answer):
             self.assertTrue(np.array_equal(result, answer))
@@ -268,7 +268,7 @@ class TestCommitteeScorer(unittest.TestCase):
             np.hstack((y_train, y_train[1])),
             clf
         )
-        execution_result = [clf.predict(X_new) for clf in scorer.committee]
+        execution_result = [clf.predict(X_new) for clf in scorer.get_tools()]
         true_answer = [np.array([1, 1, 2, 1, 1]) for _ in range(3)]
         for result, answer in zip(execution_result, true_answer):
             self.assertTrue(np.array_equal(result, answer))
@@ -319,7 +319,7 @@ class TestVarianceScorerForRegression(unittest.TestCase):
             )
         }
         scorer.set_tools(another_rgrs)
-        predictions = scorer.rgrs['target'].predict(X_new)
+        predictions = scorer.get_tools()['target'].predict(X_new)
         another_predictions = another_rgrs['target'].predict(X_new)
         self.assertTrue(np.array_equal(predictions, another_predictions))
 
@@ -340,13 +340,13 @@ class TestVarianceScorerForRegression(unittest.TestCase):
             rgrs=rgrs
         )
         scorer.update_tools(X_train, y_train)
-        execution_result = scorer.rgrs['target'].predict(X_new)
+        execution_result = scorer.get_tools()['target'].predict(X_new)
         true_answer = np.array([1.6, 2.2, 2.2, 1.6, 1.4])
         self.assertTrue(np.array_equal(execution_result, true_answer))
         scorer.update_tools(
             X_train[:-1, :], y_train[:-1], KNeighborsRegressor()
         )
-        execution_result = scorer.rgrs['target'].predict(X_new)
+        execution_result = scorer.get_tools()['target'].predict(X_new)
         true_answer = np.array([1.6, 1.8, 2.4, 1.6, 1.4])
         self.assertTrue(np.array_equal(execution_result, true_answer))
 
@@ -394,6 +394,80 @@ class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
         self.assertTrue(len(picked_indices) == 2)
         for index in picked_indices:
             self.assertTrue(0 <= index < len(X_new))
+
+    def test_get_tools(self) -> type(None):
+        """
+        Test that `get_tools` method works correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        clf = KNeighborsClassifier()
+        clf.fit(X_train, y_train)
+        scorer = CommitteeScorer(
+            compute_confidences, revert_sign=True, committee=[clf]
+        )
+        picker = EpsilonGreedyPickerFromPool(scorer)
+        another_clf = picker.get_tools()[0]
+        predictions = clf.predict(X_new)
+        another_predictions = another_clf.predict(X_new)
+        self.assertTrue(np.array_equal(predictions, another_predictions))
+
+    def test_set_tools(self) -> type(None):
+        """
+        Test that `set_tools` method works correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        clf = KNeighborsClassifier()
+        clf.fit(X_train, y_train)
+        scorer = UncertaintyScorerForClassification(
+            compute_confidences, revert_sign=True, clf=clf
+        )
+        another_scorer = UncertaintyScorerForClassification(
+            compute_confidences, revert_sign=True
+        )
+        picker = EpsilonGreedyPickerFromPool(
+            scorer, exploration_probability=0
+        )
+        another_picker = EpsilonGreedyPickerFromPool(
+            another_scorer, exploration_probability=0
+        )
+        another_picker.set_tools(clf)
+        execution_result = picker.pick_new_objects(X_new)
+        another_execution_result = another_picker.pick_new_objects(X_new)
+        self.assertTrue(execution_result == another_execution_result)
+
+    def test_update_tools(self) -> type(None):
+        """
+        Test that `set_tools` method works correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        clf = KNeighborsClassifier()
+        clf.fit(X_train, y_train)
+        scorer = UncertaintyScorerForClassification(
+            compute_confidences, revert_sign=True, clf=clf
+        )
+        another_clf = KNeighborsClassifier()
+        another_scorer = UncertaintyScorerForClassification(
+            compute_confidences, revert_sign=True, clf=another_clf
+        )
+        picker = EpsilonGreedyPickerFromPool(
+            scorer, exploration_probability=0
+        )
+        another_picker = EpsilonGreedyPickerFromPool(
+            another_scorer, exploration_probability=0
+        )
+        another_picker.update_tools(X_train, y_train)
+        execution_result = picker.pick_new_objects(X_new)
+        another_execution_result = another_picker.pick_new_objects(X_new)
+        self.assertTrue(execution_result == another_execution_result)
 
 
 def main():
