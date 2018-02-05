@@ -552,13 +552,17 @@ class EpsilonGreedyPickerFromPool:
         of these strings: 'confidence', 'margin', 'entropy',
         'divergence', 'predictions_variance', 'target_variance'
     :param exploration_probability:
-        probability of picking objects at random
+        probability of picking objects at random; if it is a float,
+        this value is used always, and if it is a list of floats,
+        its i-th element is used when `pick_new_objects` method is
+        called for the i-th time, so you can use exploration schedule
+        with exploration probability decreasing over time.
     """
 
     def __init__(
             self,
             scorer: Union[str, BaseScorer],
-            exploration_probability: float = 0.1
+            exploration_probability: Union[float, List[float]] = 0.1
             ):
         str_to_scorer = defaultdict(
             lambda: scorer,
@@ -601,6 +605,16 @@ class EpsilonGreedyPickerFromPool:
         )
         return picked_indices
 
+    def __get_current_exploration_probability(self) -> float:
+        # Get exploration probability for the current call of
+        # `pick_new_objects`.
+        if isinstance(self.__exploration_probability, (float, int)):
+            return self.__exploration_probability
+        elif len(self.__exploration_probability) == 0:
+            raise StopIteration("All exploration probabilities are popped.")
+        else:
+            return self.__exploration_probability.pop(0)
+
     def pick_new_objects(
             self,
             X_new: np.ndarray,
@@ -618,7 +632,8 @@ class EpsilonGreedyPickerFromPool:
         """
         self.n_to_pick = n_to_pick
         outcome = np.random.uniform()
-        if outcome > self.__exploration_probability:
+        exploration_probability = self.__get_current_exploration_probability()
+        if outcome > exploration_probability:
             picked_indices = self.__exploit(X_new)
         else:
             picked_indices = self.__explore(X_new.shape[0])

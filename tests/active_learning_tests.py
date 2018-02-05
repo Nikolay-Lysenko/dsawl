@@ -395,6 +395,37 @@ class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
         for index in picked_indices:
             self.assertTrue(0 <= index < len(X_new))
 
+    def test_pick_new_objects_with_exploration_schedule(self) -> type(None):
+        """
+        Test that `pick_new_objects` method works correctly
+        when exploration probability decays over time.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        clf = KNeighborsClassifier()
+        clf.fit(X_train, y_train)
+        scorer = UncertaintyScorerForClassification(
+            compute_confidences, revert_sign=True, clf=clf
+        )
+        epsilons = [0.3, 0.2, 0.1]
+        picker = EpsilonGreedyPickerFromPool(
+            scorer,
+            exploration_probability=epsilons
+        )
+        for i in range(len(epsilons)):
+            picked_indices = picker.pick_new_objects(X_new, n_to_pick=2)
+            self.assertTrue(len(picked_indices) == 2)
+            for index in picked_indices:
+                self.assertTrue(0 <= index < len(X_new))
+        try:
+            picker.pick_new_objects(X_new, n_to_pick=2)
+        except Exception as e:
+            self.assertTrue("are popped" in str(e))
+        else:
+            self.fail("`StopIteration` must be thrown.")
+
     def test_get_tools(self) -> type(None):
         """
         Test that `get_tools` method works correctly.
