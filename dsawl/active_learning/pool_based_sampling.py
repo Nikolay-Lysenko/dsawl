@@ -5,9 +5,10 @@ to active learning.
 Active learning setup assumes that, given a model and a training set,
 it is possible to extend the training set with new labelled examples
 and the goal is to do it with maximum possible improvement of model
-quality. Further, pool-bases sampling means that new examples come from
+quality subject to constraint on how many new examples can be added.
+Further, pool-bases sampling means that new examples come from
 a fixed and known set of initially unlabelled examples, i.e., the task
-is to choose which labels should be explored and disclosed.
+is to choose objects to be studied, not to synthesize them arbitrarily.
 
 @author: Nikolay Lysenko
 """
@@ -31,7 +32,7 @@ ToolsType = Union[BaseEstimator, List[BaseEstimator], Dict[str, BaseEstimator]]
 
 def compute_confidences(predicted_probabilities: np.ndarray) -> np.ndarray:
     """
-    Compute confidence of classifier on new objects.
+    Compute confidences of classifier on new objects.
     Here confidence on an object means predicted probability
     of the predicted class.
 
@@ -65,8 +66,8 @@ def compute_margins(predicted_probabilities: np.ndarray) -> np.ndarray:
 
 def compute_entropy(predicted_probabilities: np.ndarray) -> np.ndarray:
     """
-    Compute Shannon entropy of predicted probabilities for each
-    of the new objects.
+    Compute Shannon entropy of predicted class label distribution
+    for each of the new objects.
 
     :param predicted_probabilities:
         predicted by the classifier probabilities of classes for
@@ -86,7 +87,7 @@ def compute_committee_divergences(
     probabilities differ from each other.
     Namely, this value is sum over all classifiers of Kullback-Leibler
     divergences between predicted by a classifier probabilities
-    and consensus probabilities.
+    and consensus probabilities (i.e., averaged probabilities).
 
     :param list_of_predicted_probabilities:
         list such that its i-th element is predicted by the i-th
@@ -113,7 +114,8 @@ def compute_committee_variances(
         ) -> np.ndarray:
     """
     Compute a value that indicates how predicted by various regressors
-    values differ from each other. Namely, this value is variance.
+    values differ from each other. Namely, this value on an object
+    is variance of predictions made for this object.
 
     :param list_of_predictions:
         list such that its i-th element is predicted by the i-th
@@ -132,8 +134,9 @@ def compute_estimations_of_variance(
         predictions: np.ndarray, predictions_of_square: np.ndarray
         ) -> np.ndarray:
     """
-    Estimate variance assuming that one regressor predicts mean of
-    target and another regressor predicts mean of squared target.
+    Estimate variance of target variable assuming that one regressor
+    predicts mean of the target and another regressor predicts mean of
+    the squared target.
 
     :param predictions:
         estimations of mean of target on new objects,
@@ -154,8 +157,7 @@ def compute_estimations_of_variance(
 class BaseScorer(ABC):
     """
     A facade that provides unified interface for various functions
-    that score objects from a pool based on usefulness of their
-    labels.
+    that score objects from a pool by usefulness of their labels.
 
     :param scoring_fn:
         function for scoring objects
@@ -226,12 +228,24 @@ class UncertaintyScorerForClassification(BaseScorer):
         super().__init__(scoring_fn, revert_sign, is_classification=True)
         self.__clf = clf
 
-    def __check_classifier(self) -> type(None):
+    def __check_classifier_before_scoring(self) -> type(None):
         # Check that classifier is passed and has proper methods.
         if self.__clf is None:
             raise RuntimeError("Classifier must be passed before scoring.")
-        if getattr(self.__clf, 'predict_proba', None) is None:
+        if not hasattr(self.__clf, 'predict_proba'):
             raise ValueError("Classifier must have `predict_proba` method.")
+
+    def __check_classifier_before_update(
+            self,
+            clf: Optional[BaseEstimator] = None
+            ) -> type(None):
+        # Check that classifier to be used has proper methods.
+        if clf is not None:
+            clf_to_be_used = clf
+        else:
+            clf_to_be_used = self.__clf
+        if not hasattr(clf_to_be_used, 'fit'):
+            raise ValueError("Classifier must have `fit` method.")
 
     def get_tools(self) -> BaseEstimator:
         """
@@ -276,15 +290,17 @@ class UncertaintyScorerForClassification(BaseScorer):
         :return:
             None
         """
-        if est is None and self.__clf is not None:
+        if est is not None:
+            self.__check_classifier_before_update(est)
+            self.__clf = est.fit(X_train, y_train)
+        elif self.__clf is not None:
+            self.__check_classifier_before_update()
             self.__clf.fit(X_train, y_train)
-        elif est is None and self.__clf is None:
+        else:
             raise RuntimeError(
                 "Classifier is not passed neither to initialization "
                 "nor to this function."
             )
-        else:
-            self.__clf = est.fit(X_train, y_train)
 
     def score(self, X_new: np.ndarray) -> np.ndarray:
         """
@@ -296,7 +312,7 @@ class UncertaintyScorerForClassification(BaseScorer):
         :return:
             uncertainty scores computed with `self.scoring_fn`
         """
-        self.__check_classifier()
+        self.__check_classifier_before_scoring()
         predicted_probabilities = self.__clf.predict_proba(X_new)
         scores = self._scoring_fn(predicted_probabilities)
         if self._revert_sign:
@@ -334,12 +350,28 @@ class CommitteeScorer(BaseScorer):
         super().__init__(scoring_fn, revert_sign, is_classification)
         self.__committee = committee
 
-    def __check_committee(self) -> type(None):
+    def __check_committee_before_scoring(self) -> type(None):
         # Check that committee is not empty.
         if self.__committee is None:
             raise RuntimeError("Committee must be provided before scoring.")
         if len(self.__committee) == 0:
             raise RuntimeError("Committee has zero length.")
+
+    def __check_estimator_before_update(
+            self,
+            est: Optional[BaseEstimator] = None
+            ) -> type(None):
+        # Check that estimator to be cloned for committee has proper methods.
+        if est is None:
+            est_to_be_cloned = (
+                self.__committee[0] if len(self.__committee) > 0 else None
+            )
+        else:
+            est_to_be_cloned = est
+        if est_to_be_cloned is None:
+            raise RuntimeError("Committee has zero length.")
+        if not hasattr(est_to_be_cloned, 'fit'):
+            raise ValueError("Estimator must have `fit` method.")
 
     def get_tools(self) -> List[BaseEstimator]:
         """
@@ -388,18 +420,20 @@ class CommitteeScorer(BaseScorer):
         :return:
             None
         """
-        if est is None and self.__committee is not None:
+        if est is not None:
+            self.__check_estimator_before_update(est)
+            self.__committee = make_committee(
+                est, X_train, y_train, *args, **kwargs
+            )
+        elif self.__committee is not None:
+            self.__check_estimator_before_update()
             self.__committee = make_committee(
                 self.__committee[0], X_train, y_train, *args, **kwargs
             )
-        elif est is None and self.__committee is None:
+        else:
             raise RuntimeError(
                 "Committee is not passed neither to initialization "
                 "nor to this function."
-            )
-        else:
-            self.__committee = make_committee(
-                est, X_train, y_train, *args, **kwargs
             )
 
     def score(self, X_new: np.ndarray) -> np.ndarray:
@@ -412,7 +446,7 @@ class CommitteeScorer(BaseScorer):
         :return:
             discrepancy scores computed with `self.scoring_fn`
         """
-        self.__check_committee()
+        self.__check_committee_before_scoring()
         if self._is_classification:
             list_of_predictions = [
                 est.predict_proba(X_new) for est in self.__committee
@@ -439,7 +473,7 @@ class VarianceScorerForRegression(BaseScorer):
         dict with keys 'target' and 'target^2' and values that
         are regressors predicting target variable and squared
         target variable respectively, these regressors must
-        have method `predict` for doing so
+        have `predict` method for doing so
     """
 
     def __init__(
@@ -452,14 +486,33 @@ class VarianceScorerForRegression(BaseScorer):
         )
         self.__rgrs = rgrs
 
-    def __check_regressors(self) -> type(None):
+    def __check_regressors_before_scoring(self) -> type(None):
         # Check that regressors are passed and have proper methods.
         if self.__rgrs is None:
             raise RuntimeError("Regressors must be passed before scoring.")
-        if getattr(self.__rgrs['target'], 'predict', None) is None:
-            raise ValueError("Regressor must have `predict` method.")
-        if getattr(self.__rgrs['target^2'], 'predict', None) is None:
-            raise ValueError("Regressor must have `predict` method.")
+        for key in ['target', 'target^2']:
+            if self.__rgrs.get(key, None) is None:
+                raise ValueError("{key} must be a key.".format(key=key))
+            if not hasattr(self.__rgrs[key], 'predict'):
+                raise ValueError("Regressor must have `predict` method.")
+
+    def __check_regressor_before_update(
+            self,
+            rgr: Optional[BaseEstimator] = None
+            ) -> type(None):
+        # Check that estimator to be cloned for committee has proper methods.
+        if rgr is None:
+            first_member = self.__rgrs.get('target', None)
+            if first_member is None:
+                raise ValueError("Key 'target' is missed.")
+            second_member = self.__rgrs.get('target^2', None)
+            if second_member is None:
+                raise ValueError("Key 'target^2' is missed.")
+            rgr_to_be_cloned = first_member
+        else:
+            rgr_to_be_cloned = rgr
+        if not hasattr(rgr_to_be_cloned, 'fit'):
+            raise ValueError("Regressor must have `fit` method.")
 
     def get_tools(self) -> Dict[str, BaseEstimator]:
         """
@@ -488,7 +541,7 @@ class VarianceScorerForRegression(BaseScorer):
             self,
             X_train: np.ndarray,
             y_train: np.ndarray,
-            est: Optional[BaseEstimator] = None,
+            rgr: Optional[BaseEstimator] = None,
             *args, **kwargs
             ) -> type(None):
         """
@@ -500,27 +553,29 @@ class VarianceScorerForRegression(BaseScorer):
             feature representation of training objects
         :param y_train:
             target variable
-        :param est:
+        :param rgr:
             regressor that has methods `fit` and `predict`; if it
             is passed, it and its clone form a new pair of regressors
         :return:
             None
         """
-        if est is None and self.__rgrs is not None:
+        if rgr is not None:
+            self.__check_regressor_before_update(rgr)
+            self.__rgrs = {
+                'target': rgr.fit(X_train, y_train),
+                'target^2': clone(rgr).fit(X_train, y_train ** 2)
+            }
+        elif self.__rgrs is not None:
+            self.__check_regressor_before_update()
             self.__rgrs = {
                 'target': self.__rgrs['target'].fit(X_train, y_train),
                 'target^2': self.__rgrs['target^2'].fit(X_train, y_train ** 2)
             }
-        elif est is None and self.__rgrs is None:
+        else:
             raise RuntimeError(
                 "Regressors is not passed neither to initialization "
                 "nor to this function."
             )
-        else:
-            self.__rgrs = {
-                'target': est.fit(X_train, y_train),
-                'target^2': clone(est).fit(X_train, y_train ** 2)
-            }
 
     def score(self, X_new: np.ndarray) -> np.ndarray:
         """
@@ -532,7 +587,7 @@ class VarianceScorerForRegression(BaseScorer):
         :return:
             estimates of variance computed with `self.scoring_fn`
         """
-        self.__check_regressors()
+        self.__check_regressors_before_scoring()
         predictions = self.__rgrs['target'].predict(X_new)
         predictions_of_square = self.__rgrs['target^2'].predict(X_new)
         scores = self._scoring_fn(predictions, predictions_of_square)
@@ -552,13 +607,17 @@ class EpsilonGreedyPickerFromPool:
         of these strings: 'confidence', 'margin', 'entropy',
         'divergence', 'predictions_variance', 'target_variance'
     :param exploration_probability:
-        probability of picking objects at random
+        probability of picking objects at random; if it is a float,
+        this value is used always, and if it is a list of floats,
+        its i-th element is used when `pick_new_objects` method is
+        called for the i-th time, so you can use exploration schedule
+        with exploration probability decreasing over time.
     """
 
     def __init__(
             self,
             scorer: Union[str, BaseScorer],
-            exploration_probability: float = 0.1
+            exploration_probability: Union[float, List[float]] = 0.1
             ):
         str_to_scorer = defaultdict(
             lambda: scorer,
@@ -601,6 +660,16 @@ class EpsilonGreedyPickerFromPool:
         )
         return picked_indices
 
+    def __get_current_exploration_probability(self) -> float:
+        # Get exploration probability for the current call of
+        # `pick_new_objects`.
+        if isinstance(self.__exploration_probability, (float, int)):
+            return self.__exploration_probability
+        elif len(self.__exploration_probability) == 0:
+            raise StopIteration("All exploration probabilities are popped.")
+        else:
+            return self.__exploration_probability.pop(0)
+
     def pick_new_objects(
             self,
             X_new: np.ndarray,
@@ -614,11 +683,12 @@ class EpsilonGreedyPickerFromPool:
         :param n_to_pick:
             number of objects to pick
         :return:
-            indices of the most important object
+            indices of the most important objects
         """
         self.n_to_pick = n_to_pick
         outcome = np.random.uniform()
-        if outcome > self.__exploration_probability:
+        exploration_probability = self.__get_current_exploration_probability()
+        if outcome > exploration_probability:
             picked_indices = self.__exploit(X_new)
         else:
             picked_indices = self.__explore(X_new.shape[0])

@@ -23,6 +23,113 @@ from dsawl.active_learning.pool_based_sampling import (
 )
 
 
+def get_predictions() -> np.ndarray:
+    """
+    Get data that can be treated both as predicted probabilities of
+    class labels or as predictions of multiple continuous values.
+
+    :return:
+        predictions
+    """
+    predictions = np.array(
+        [[0.2, 0.5, 0.3],
+         [0.9, 0.1, 0],
+         [0.33, 0.34, 0.33],
+         [0.5, 0.5, 0]]
+    )
+    return predictions
+
+
+class TestScoringFunctions(unittest.TestCase):
+    """
+    Tests of scoring functions.
+    """
+
+    def test_compute_confidences(self) -> type(None):
+        """
+        Test that `compute_confidences` function works correctly.
+
+        :return:
+            None
+        """
+        predicted_probabilities = get_predictions()
+        execution_result = compute_confidences(predicted_probabilities)
+        true_answer = np.array([0.5, 0.9, 0.34, 0.5])
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+    def test_compute_margins(self) -> type(None):
+        """
+        Test that `compute_margins` function works correctly.
+
+        :return:
+            None
+        """
+        predicted_probabilities = get_predictions()
+        execution_result = compute_margins(predicted_probabilities)
+        true_answer = np.array([0.2, 0.8, 0.01, 0.])
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+    def test_compute_entropy(self) -> type(None):
+        """
+        Test that `compute_entropy` function works correctly.
+
+        :return:
+            None
+        """
+        predicted_probabilities = get_predictions()
+        execution_result = compute_entropy(predicted_probabilities)
+        true_answer = np.array(
+            [1.02965301, 0.32508297, 1.09851262, 0.69314718]
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+    def test_compute_committee_divergences(self) -> type(None):
+        """
+        Test that `compute_committee_divergences` function
+        works correctly.
+
+        :return:
+            None
+        """
+        stub = get_predictions()
+        list_of_predicted_probabilities = [stub[:2, :], stub[2:, :]]
+        execution_result = compute_committee_divergences(
+            list_of_predicted_probabilities
+        )
+        true_answer = np.array([0.0321534, 0.20349845])
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+    def test_compute_committee_variances(self) -> type(None):
+        """
+        Test that `compute_committee_variances` function
+        works correctly.
+
+        :return:
+            None
+        """
+        stub = get_predictions()
+        list_of_predictions = [stub[:2, 0], stub[2:, 0]]
+        execution_result = compute_committee_variances(list_of_predictions)
+        true_answer = np.array([0.004225, 0.04])
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+    def test_compute_estimations_of_variance(self) -> type(None):
+        """
+        Test that `compute_estimations_of_variance` function
+        works correctly.
+
+        :return:
+            None
+        """
+        predictions = np.array([0.1, 0.2, 0.3])
+        predictions_of_square = np.array([0.2, 0.3, 0.4])
+        execution_result = compute_estimations_of_variance(
+            predictions, predictions_of_square
+        )
+        true_answer = np.array([0.19, 0.26, 0.31])
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+
 def get_dataset_and_pool() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Get dataset with target variable that can be considered both
@@ -395,6 +502,37 @@ class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
         for index in picked_indices:
             self.assertTrue(0 <= index < len(X_new))
 
+    def test_pick_new_objects_with_exploration_schedule(self) -> type(None):
+        """
+        Test that `pick_new_objects` method works correctly
+        when exploration probability decays over time.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        clf = KNeighborsClassifier()
+        clf.fit(X_train, y_train)
+        scorer = UncertaintyScorerForClassification(
+            compute_confidences, revert_sign=True, clf=clf
+        )
+        epsilons = [0.3, 0.2, 0.1]
+        picker = EpsilonGreedyPickerFromPool(
+            scorer,
+            exploration_probability=epsilons
+        )
+        for i in range(len(epsilons)):
+            picked_indices = picker.pick_new_objects(X_new, n_to_pick=2)
+            self.assertTrue(len(picked_indices) == 2)
+            for index in picked_indices:
+                self.assertTrue(0 <= index < len(X_new))
+        try:
+            picker.pick_new_objects(X_new, n_to_pick=2)
+        except Exception as e:
+            self.assertTrue("are popped" in str(e))
+        else:
+            self.fail("`StopIteration` must be thrown.")
+
     def test_get_tools(self) -> type(None):
         """
         Test that `get_tools` method works correctly.
@@ -474,6 +612,7 @@ def main():
     test_loader = unittest.TestLoader()
     suites_list = []
     testers = [
+        TestScoringFunctions(),
         TestUncertaintyScorerForClassification(),
         TestCommitteeScorer(),
         TestVarianceScorerForRegression(),
