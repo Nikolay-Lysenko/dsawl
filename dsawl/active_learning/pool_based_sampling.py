@@ -820,34 +820,40 @@ class CombinedSamplerFromPool:
             scorers: List[Union[str, BaseScorer]],
             scorers_probabilities: Optional[List[float]] = None
             ):
-        str_to_scorer = dict(
-            confidence=UncertaintyScorerForClassification(
-                compute_confidences, revert_sign=True
-            ),
-            margin=UncertaintyScorerForClassification(
-                compute_margins, revert_sign=True
-            ),
-            entropy=UncertaintyScorerForClassification(
-                compute_entropy
-            ),
-            divergence=CommitteeScorer(
-                compute_committee_divergences
-            ),
-            predictions_variance=CommitteeScorer(
-                compute_committee_variances, is_classification=False
-            ),
-            target_variance=VarianceScorerForRegression(
-                compute_estimations_of_variance,
-            ),
-            random=RandomScorer(),
-            density=DensityScorer()
-        )
-        scorers = [str_to_scorer.get(scorer, scorer) for scorer in scorers]
-        self.__scorers = scorers
-
+        self.__scorers = None
+        self.__set_scorers(scorers)
         self.__scorers_probabilities = None
         scorers_probabilities = scorers_probabilities or [1 for _ in scorers]
         self.set_scorers_probabilities(scorers_probabilities)
+
+    def __set_scorers(
+            self, scorers: List[Union[str, BaseScorer]]
+            ) -> type(None):
+        # Set scorers based on passed values.
+        str_to_scorer = {
+            'confidence': UncertaintyScorerForClassification(
+                compute_confidences, revert_sign=True
+            ),
+            'margin': UncertaintyScorerForClassification(
+                compute_margins, revert_sign=True
+            ),
+            'entropy': UncertaintyScorerForClassification(
+                compute_entropy
+            ),
+            'divergence': CommitteeScorer(
+                compute_committee_divergences
+            ),
+            'predictions_variance': CommitteeScorer(
+                compute_committee_variances, is_classification=False
+            ),
+            'target_variance': VarianceScorerForRegression(
+                compute_estimations_of_variance,
+            ),
+            'random': RandomScorer(),
+            'density': DensityScorer()
+        }
+        scorers = [str_to_scorer.get(scorer, scorer) for scorer in scorers]
+        self.__scorers = scorers
 
     def set_scorers_probabilities(
             self,
@@ -891,36 +897,36 @@ class CombinedSamplerFromPool:
         picked_indices = scores.argsort()[-n_to_pick:].tolist()
         return picked_indices
 
-    def get_tools(self, i: int) -> ToolsType:
+    def get_tools(self, scorer_id: int) -> ToolsType:
         """
         Get estimator or ensemble of estimators such that it is used
         by the i-th scorer for scoring new objects by usefulness
         of their labels.
 
-        :param i:
+        :param scorer_id:
             number of scorer
         :return:
             internal tools of `self.__scorer`
         """
-        return self.__scorers[i].get_tools()
+        return self.__scorers[scorer_id].get_tools()
 
-    def set_tools(self, i: int, tools: ToolsType) -> type(None):
+    def set_tools(self, scorer_id: int, tools: ToolsType) -> type(None):
         """
         Replace internal tools of the i-th scorer with
         the passed tools.
 
-        :param i:
+        :param scorer_id:
             number of scorer
         :param tools:
             new internal tools of scorer
         :return:
             None
         """
-        self.__scorers[i].set_tools(tools)
+        self.__scorers[scorer_id].set_tools(tools)
 
     def update_tools(
             self,
-            i: int,
+            scorer_id: int,
             X_train: np.ndarray,
             y_train: np.ndarray,
             est: Optional[Union[BaseEstimator, BaseMixture]] = None,
@@ -932,7 +938,7 @@ class CombinedSamplerFromPool:
         these tools with a new ones based on the passed instance
         of `est`.
 
-        :param i:
+        :param scorer_id:
             number of scorer
         :param X_train:
             feature representation of training objects
@@ -946,4 +952,6 @@ class CombinedSamplerFromPool:
         :return:
             None
         """
-        self.__scorers[i].update_tools(X_train, y_train, est, *args, **kwargs)
+        self.__scorers[scorer_id].update_tools(
+            X_train, y_train, est, *args, **kwargs
+        )
