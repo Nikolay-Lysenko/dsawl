@@ -32,15 +32,17 @@ ToolsType = Union[BaseEstimator, List[BaseEstimator], Dict[str, BaseEstimator]]
 
 def compute_confidences(predicted_probabilities: np.ndarray) -> np.ndarray:
     """
-    Compute confidences of classifier on new objects.
-    Here confidence on an object means predicted probability
+    Compute confidences of classifier at new objects.
+    Here confidence at an object means predicted probability
     of the predicted class.
 
     :param predicted_probabilities:
         predicted by the classifier probabilities of classes for
-        each of the new objects, shape = (n_new_objects, n_classes)
+        each of the new objects, shape = (n_new_objects, n_classes);
+        it is recommended to pass calibrated probabilities
     :return:
-        confidences of classifier on new objects
+        confidences of classifier at new objects,
+        shape = (n_new_objects,)
     """
     confidences = np.max(predicted_probabilities, axis=1)
     return confidences
@@ -55,9 +57,11 @@ def compute_margins(predicted_probabilities: np.ndarray) -> np.ndarray:
 
     :param predicted_probabilities:
         predicted by the classifier probabilities of classes for
-        each of the new objects, shape = (n_new_objects, n_classes)
+        each of the new objects, shape = (n_new_objects, n_classes);
+        it is recommended to pass calibrated probabilities
     :return:
-        margins on new objects
+        margins of predicted labels at new objects,
+        shape = (n_new_objects,)
     """
     sorted_probabilities = np.sort(predicted_probabilities, axis=1)
     margins = sorted_probabilities[:, -1] - sorted_probabilities[:, -2]
@@ -71,9 +75,11 @@ def compute_entropy(predicted_probabilities: np.ndarray) -> np.ndarray:
 
     :param predicted_probabilities:
         predicted by the classifier probabilities of classes for
-        each of the new objects, shape = (n_new_objects, n_classes)
+        each of the new objects, shape = (n_new_objects, n_classes);
+        it is recommended to pass calibrated probabilities
     :return:
-        entropy on new objects
+        entropy of predictions at new objects,
+        shape = (n_new_objects,)
     """
     entropy = scipy.stats.entropy(predicted_probabilities.T)
     return entropy
@@ -92,9 +98,11 @@ def compute_committee_divergences(
     :param list_of_predicted_probabilities:
         list such that its i-th element is predicted by the i-th
         classifier probabilities of classes for new objects;
-        all elements have shape (n_new_objects, n_classes)
+        all elements have shape (n_new_objects, n_classes);
+        it is recommended to calibrate probabilities
     :return:
-        sums of Kullback-Leibler divergences
+        sums of Kullback-Leibler divergences,
+        shape = (n_new_objects,)
     """
     summed_probabilities = sum(list_of_predicted_probabilities)
     committee_size = len(list_of_predicted_probabilities)
@@ -114,14 +122,15 @@ def compute_committee_variances(
         ) -> np.ndarray:
     """
     Compute a value that indicates how predicted by various regressors
-    values differ from each other. Namely, this value on an object
+    values differ from each other. Namely, this value at an object
     is variance of predictions made for this object.
 
     :param list_of_predictions:
         list such that its i-th element is predicted by the i-th
         regressor values; all elements have shape (n_new_objects,)
     :return:
-        variance of predictions for each new object
+        variance of predictions for each new object,
+        shape = (n_new_objects,)
     """
     all_predictions = np.hstack(
         [np.array(x).reshape(-1, 1) for x in list_of_predictions]
@@ -139,13 +148,14 @@ def compute_estimations_of_variance(
     the squared target.
 
     :param predictions:
-        estimations of mean of target on new objects,
+        estimations of mean of target at new objects,
         shape = (n_new_objects,)
     :param predictions_of_square:
-        estimations of mean of squared target on new objects,
+        estimations of mean of squared target at new objects,
         shape = (n_new_objects,)
     :return:
-        estimations of variance
+        estimations of target variable variance,
+        shape = (n_new_objects,)
     """
     estimations_of_variance = predictions_of_square - predictions ** 2
     estimations_of_variance = np.maximum(estimations_of_variance, 0)
@@ -216,7 +226,9 @@ class UncertaintyScorerForClassification(BaseScorer):
         and `True` else
     :param clf:
         classifier that has methods `fit` and `predict_proba`,
-        it becomes internal classifier of the scorer
+        it becomes internal classifier of the scorer; it is recommended
+        to wrap `clf` in `sklearn.calibration.CalibratedClassifierCV`
+        if it does not predict well-calibrated probabilities by default
     """
 
     def __init__(
@@ -261,7 +273,9 @@ class UncertaintyScorerForClassification(BaseScorer):
         Replace internal classifier with passed instance.
 
         :param tools:
-            classifier that has methods `fit` and `predict_proba`
+            classifier that has methods `fit` and `predict_proba`,
+            it is assumed that `predict_proba` method returns
+            well-calibrated probabilities
         :return:
             None
         """
@@ -286,7 +300,8 @@ class UncertaintyScorerForClassification(BaseScorer):
         :param est:
             classifier that has methods `fit` and `predict_proba`;
             if it is passed, its fitted instance becomes internal
-            classifier
+            classifier, so it is assumed that `predict_proba` method
+            returns well-calibrated probabilities
         :return:
             None
         """
@@ -337,7 +352,12 @@ class CommitteeScorer(BaseScorer):
     :param committee:
         list of instances of the same class fitted to different folds,
         instances must have `predict_proba` method if it is
-        classification or `predict` method if it is regression
+        classification or `predict` method if it is regression;
+        if it is classification, it is assumed that `predict_proba`
+        returns well-calibrated probabilities, so consider to wrap
+        instances in `sklearn.calibration.CalibratedClassifierCV`
+        if they do not predict well-calibrated probabilities
+        by default
     """
 
     def __init__(
@@ -389,7 +409,9 @@ class CommitteeScorer(BaseScorer):
         :param tools:
             list of instances of the same class fitted to different
             folds, instances must have `predict_proba` method if it
-            is classification or `predict` method if it is regression
+            is classification or `predict` method if it is regression;
+            if it is classification, it is assumed that `predict_proba`
+            returns well-calibrated probabilities
         :return:
             None
         """
@@ -416,7 +438,9 @@ class CommitteeScorer(BaseScorer):
             `predict_proba` if it is a classifier or it must have
             method `predict` if it is a regressor; if it is passed,
             its clones become members of the committee instead of
-            previous members
+            previous members, so it is also assumed that
+            `predict_proba` method returns well-calibrated
+            probabilities
         :return:
             None
         """
