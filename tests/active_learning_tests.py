@@ -11,15 +11,17 @@ import unittest
 from typing import Tuple
 
 import numpy as np
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.neighbors import (
+    KNeighborsClassifier, KNeighborsRegressor, KernelDensity
+)
 
 from dsawl.active_learning.pool_based_sampling import (
     compute_confidences, compute_margins, compute_entropy,
     compute_committee_divergences, compute_committee_variances,
     compute_estimations_of_variance,
     UncertaintyScorerForClassification, CommitteeScorer,
-    VarianceScorerForRegression,
-    EpsilonGreedyPickerFromPool
+    VarianceScorerForRegression, RandomScorer, DensityScorer,
+    CombinedSamplerFromPool
 )
 
 
@@ -186,7 +188,7 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
 
     def test_score_with_confidences(self) -> type(None):
         """
-        Test that `score` method` works correctly if
+        Test that `score` method works correctly if
         scoring is based on confidences.
 
         :return:
@@ -206,7 +208,7 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
 
     def test_score_with_margins(self) -> type(None):
         """
-        Test that `score` method` works correctly if
+        Test that `score` method works correctly if
         scoring is based on margins.
 
         :return:
@@ -226,7 +228,7 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
 
     def test_score_with_entropy(self) -> type(None):
         """
-        Test that `score` method` works correctly if
+        Test that `score` method works correctly if
         scoring is based on entropy.
 
         :return:
@@ -245,9 +247,10 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
         )
         self.assertTrue(np.allclose(execution_result, true_answer))
 
-    def test_set_tools(self) -> type(None):
+    def test_get_tools_and_set_tools(self) -> type(None):
         """
-        Test that `set_tools` method works correctly.
+        Test that `get_tools` and `set_tools` methods work
+        correctly.
 
         :return:
             None
@@ -296,7 +299,7 @@ class TestCommitteeScorer(unittest.TestCase):
 
     def test_score_with_divergences(self) -> type(None):
         """
-        Test that `score` method` works correctly if it is
+        Test that `score` method works correctly if it is
         a classification problem and scoring is based on
         Kullback-Leibler divergence.
 
@@ -314,7 +317,7 @@ class TestCommitteeScorer(unittest.TestCase):
 
     def test_score_with_variances(self) -> type(None):
         """
-        Test that `score` method` works correctly if it is
+        Test that `score` method works correctly if it is
         a regression problem and scoring is based on variance of
         predictions.
 
@@ -331,9 +334,10 @@ class TestCommitteeScorer(unittest.TestCase):
         true_answer = np.array([0, 0, 0, 0.008888889, 0])
         self.assertTrue(np.allclose(execution_result, true_answer))
 
-    def test_set_tools(self) -> type(None):
+    def test_get_tools_and_set_tools(self) -> type(None):
         """
-        Test that `set_tools` method works correctly.
+        Test that `get_tools` and `set_tools` methods work
+        correctly.
 
         :return:
             None
@@ -388,7 +392,7 @@ class TestVarianceScorerForRegression(unittest.TestCase):
 
     def test_score_with_estimation_of_target_variance(self) -> type(None):
         """
-        Test that `score` method` works correctly if scoring
+        Test that `score` method works correctly if scoring
         is based on estimation of target variable's variance.
 
         :return:
@@ -403,9 +407,10 @@ class TestVarianceScorerForRegression(unittest.TestCase):
         true_answer = np.array([0.24, 0.96, 0.56, 0.64, 0.24])
         self.assertTrue(np.allclose(execution_result, true_answer))
 
-    def test_set_tools(self) -> type(None):
+    def test_get_tools_and_set_tools(self) -> type(None):
         """
-        Test that `set_tools` method works correctly.
+        Test that `get_tools` and `set_tools` methods work
+        correctly.
 
         :return:
             None
@@ -458,15 +463,127 @@ class TestVarianceScorerForRegression(unittest.TestCase):
         self.assertTrue(np.array_equal(execution_result, true_answer))
 
 
-class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
+class TestRandomScorer(unittest.TestCase):
     """
-    Tests of `EpsilonGreedyPickerFromPool` class.
+    Tests of `RandomScorer` class.
     """
 
-    def test_pick_new_objects_with_zero_exploration(self) -> type(None):
+    def test_score(self) -> type(None):
+        """
+        Test that `score` method runs.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        scorer = RandomScorer()
+        execution_result = scorer.score(X_new)
+        self.assertTrue(len(execution_result) == len(X_new))
+
+    def test_get_tools_and_set_tools(self) -> type(None):
+        """
+        Test that `get_tools` and `set_tools` methods work
+        correctly.
+
+        :return:
+            None
+        """
+        scorer = RandomScorer()
+        clf = KNeighborsClassifier()
+        scorer.set_tools(clf)
+        execution_result = scorer.get_tools()
+        self.assertTrue(execution_result is None)
+
+    def test_update_tools(self) -> type(None):
+        """
+        Test that `update_tools` method works correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        scorer = RandomScorer()
+        scorer.update_tools(X_train, y_train)
+        execution_result = scorer.get_tools()
+        self.assertTrue(execution_result is None)
+
+
+class TestDensityScorer(unittest.TestCase):
+    """
+    Tests of `DensityScorer` class.
+    """
+
+    def test_score(self) -> type(None):
+        """
+        Test that `score` method works correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        est = KernelDensity()
+        est.fit(X_train, y_train)
+        scorer = DensityScorer(est)
+        execution_result = scorer.score(X_new)
+        true_answer = np.array(
+            [3.12072551, 3.12072551, 3.20416149, 2.86297789, 11.471556]
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+    def test_get_tools_and_set_tools(self) -> type(None):
+        """
+        Test that `get_tools` and `set_tools` methods work
+        correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        est = KernelDensity()
+        est.fit(X_train, y_train)
+        scorer = DensityScorer(est)
+        another_est = KernelDensity()
+        another_est.fit(X_train[:-1, :], y_train[:-1])
+        scorer.set_tools(another_est)
+        estimates = scorer.get_tools().score_samples(X_new)
+        another_estimates = another_est.score_samples(X_new)
+        self.assertTrue(np.array_equal(estimates, another_estimates))
+
+    def test_update_tools(self) -> type(None):
+        """
+        Test that `update_tools` method works correctly.
+
+        :return:
+            None
+        """
+        X_train, y_train, X_new = get_dataset_and_pool()
+        est = KernelDensity()
+        scorer = DensityScorer(est)
+        scorer.update_tools(X_train, y_train)
+        execution_result = scorer.score(X_new)
+        true_answer = np.array(
+            [3.12072551, 3.12072551, 3.20416149, 2.86297789, 11.471556]
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+        scorer.update_tools(
+            X_train[:-1, :], y_train[:-1], KernelDensity()
+        )
+        execution_result = scorer.score(X_new)
+        true_answer = np.array(
+            [3.00564647, 3.16244687, 3.26104477, 2.78801309, 11.353773]
+        )
+        self.assertTrue(np.allclose(execution_result, true_answer))
+
+
+class TestCombinedSamplerFromPool(unittest.TestCase):
+    """
+    Tests of `CombinedSamplerFromPool` class.
+    """
+
+    def test_pick_new_objects_with_one_scorer(self) -> type(None):
         """
         Test that `pick_new_objects` method works correctly
-        when there are no exploration.
+        when there is only one scorer.
 
         :return:
             None
@@ -477,15 +594,15 @@ class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
         scorer = UncertaintyScorerForClassification(
             compute_confidences, revert_sign=True, clf=clf
         )
-        picker = EpsilonGreedyPickerFromPool(scorer, exploration_probability=0)
-        execution_result = picker.pick_new_objects(X_new)
+        sampler = CombinedSamplerFromPool([scorer])
+        execution_result = sampler.pick_new_objects(X_new)
         true_answer = [2]
         self.assertTrue(execution_result == true_answer)
 
-    def test_pick_new_objects_with_full_exploration(self) -> type(None):
+    def test_pick_new_objects_with_two_scorers(self) -> type(None):
         """
         Test that `pick_new_objects` method works correctly
-        when there are no exploitation.
+        when there are two scorers with non-zero probabilities.
 
         :return:
             None
@@ -493,45 +610,20 @@ class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
         X_train, y_train, X_new = get_dataset_and_pool()
         clf = KNeighborsClassifier()
         clf.fit(X_train, y_train)
-        scorer = UncertaintyScorerForClassification(
-            compute_confidences, revert_sign=True, clf=clf
+        scorers = [
+            UncertaintyScorerForClassification(
+                compute_confidences, revert_sign=True, clf=clf
+            ),
+            RandomScorer()
+        ]
+        sampler = CombinedSamplerFromPool(
+            scorers, scorers_probabilities=[0.2, 0.8]
         )
-        picker = EpsilonGreedyPickerFromPool(scorer, exploration_probability=1)
-        picked_indices = picker.pick_new_objects(X_new, n_to_pick=2)
+        picked_indices = sampler.pick_new_objects(X_new, n_to_pick=2)
         self.assertTrue(len(picked_indices) == 2)
         for index in picked_indices:
             self.assertTrue(0 <= index < len(X_new))
-
-    def test_pick_new_objects_with_exploration_schedule(self) -> type(None):
-        """
-        Test that `pick_new_objects` method works correctly
-        when exploration probability decays over time.
-
-        :return:
-            None
-        """
-        X_train, y_train, X_new = get_dataset_and_pool()
-        clf = KNeighborsClassifier()
-        clf.fit(X_train, y_train)
-        scorer = UncertaintyScorerForClassification(
-            compute_confidences, revert_sign=True, clf=clf
-        )
-        epsilons = [0.3, 0.2, 0.1]
-        picker = EpsilonGreedyPickerFromPool(
-            scorer,
-            exploration_probability=epsilons
-        )
-        for i in range(len(epsilons)):
-            picked_indices = picker.pick_new_objects(X_new, n_to_pick=2)
-            self.assertTrue(len(picked_indices) == 2)
-            for index in picked_indices:
-                self.assertTrue(0 <= index < len(X_new))
-        try:
-            picker.pick_new_objects(X_new, n_to_pick=2)
-        except Exception as e:
-            self.assertTrue("are popped" in str(e))
-        else:
-            self.fail("`StopIteration` must be thrown.")
+        self.assertTrue(picked_indices[0] != picked_indices[1])
 
     def test_get_tools(self) -> type(None):
         """
@@ -546,8 +638,8 @@ class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
         scorer = CommitteeScorer(
             compute_confidences, revert_sign=True, committee=[clf]
         )
-        picker = EpsilonGreedyPickerFromPool(scorer)
-        another_clf = picker.get_tools()[0]
+        sampler = CombinedSamplerFromPool([scorer])
+        another_clf = sampler.get_tools(0)[0]
         predictions = clf.predict(X_new)
         another_predictions = another_clf.predict(X_new)
         self.assertTrue(np.array_equal(predictions, another_predictions))
@@ -568,15 +660,11 @@ class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
         another_scorer = UncertaintyScorerForClassification(
             compute_confidences, revert_sign=True
         )
-        picker = EpsilonGreedyPickerFromPool(
-            scorer, exploration_probability=0
-        )
-        another_picker = EpsilonGreedyPickerFromPool(
-            another_scorer, exploration_probability=0
-        )
-        another_picker.set_tools(clf)
-        execution_result = picker.pick_new_objects(X_new)
-        another_execution_result = another_picker.pick_new_objects(X_new)
+        sampler = CombinedSamplerFromPool([scorer])
+        another_sampler = CombinedSamplerFromPool([another_scorer])
+        another_sampler.set_tools(0, clf)
+        execution_result = sampler.pick_new_objects(X_new)
+        another_execution_result = another_sampler.pick_new_objects(X_new)
         self.assertTrue(execution_result == another_execution_result)
 
     def test_update_tools(self) -> type(None):
@@ -596,15 +684,11 @@ class TestEpsilonGreedyPickerFromPool(unittest.TestCase):
         another_scorer = UncertaintyScorerForClassification(
             compute_confidences, revert_sign=True, clf=another_clf
         )
-        picker = EpsilonGreedyPickerFromPool(
-            scorer, exploration_probability=0
-        )
-        another_picker = EpsilonGreedyPickerFromPool(
-            another_scorer, exploration_probability=0
-        )
-        another_picker.update_tools(X_train, y_train)
-        execution_result = picker.pick_new_objects(X_new)
-        another_execution_result = another_picker.pick_new_objects(X_new)
+        sampler = CombinedSamplerFromPool([scorer])
+        another_sampler = CombinedSamplerFromPool([another_scorer])
+        another_sampler.update_tools(0, X_train, y_train)
+        execution_result = sampler.pick_new_objects(X_new)
+        another_execution_result = another_sampler.pick_new_objects(X_new)
         self.assertTrue(execution_result == another_execution_result)
 
 
@@ -616,7 +700,9 @@ def main():
         TestUncertaintyScorerForClassification(),
         TestCommitteeScorer(),
         TestVarianceScorerForRegression(),
-        TestEpsilonGreedyPickerFromPool()
+        TestRandomScorer(),
+        TestDensityScorer(),
+        TestCombinedSamplerFromPool()
     ]
     for tester in testers:
         suite = test_loader.loadTestsFromModule(tester)
