@@ -33,8 +33,8 @@ from .scorers import (
 
 class CombinedSamplerFromPool:
     """
-    This class is for selection objects from a pool of objects
-    in pool-based sampling approach to active learning.
+    This class is for selection of objects to be labelled
+    in a pool-based sampling setup of active learning.
 
     :param scorers:
         list of scorers for ranking new objects, each its element
@@ -92,6 +92,8 @@ class CombinedSamplerFromPool:
             ) -> type(None):
         """
         Replace probabilities of scores with a new array.
+        In particular, it can be useful for gradual decreasing of
+        exploratory actions probability.
 
         :param scorers_probabilities:
             list such that its i-th element is the probability of
@@ -128,28 +130,35 @@ class CombinedSamplerFromPool:
         picked_indices = scores.argsort()[-n_to_pick:].tolist()
         return picked_indices
 
-    def get_tools(self, scorer_id: int) -> ToolsType:
+    def get_tools(
+            self,
+            scorer_id: Optional[int] = None
+            ) -> Union[ToolsType, List[ToolsType]]:
         """
         Get estimator or ensemble of estimators such that it is used
-        by the i-th scorer for scoring new objects by usefulness
-        of their labels.
+        by the specified scorer(s) for scoring new objects
+        by usefulness of their labels.
 
         :param scorer_id:
-            number of scorer
+            identifier (number) of scorer; if it is not passed,
+            list of tools of all scorers is returned
         :return:
-            internal tools of `self.__scorer`
+            internal tools of scorer(s)
         """
-        return self.__scorers[scorer_id].get_tools()
+        if scorer_id is not None:
+            return self.__scorers[scorer_id].get_tools()
+        else:
+            return [scorer.get_tools() for scorer in self.__scorers]
 
-    def set_tools(self, scorer_id: int, tools: ToolsType) -> type(None):
+    def set_tools(self, tools: ToolsType, scorer_id: int) -> type(None):
         """
-        Replace internal tools of the i-th scorer with
+        Replace internal tools of the specified scorer with
         the passed tools.
 
-        :param scorer_id:
-            number of scorer
         :param tools:
             new internal tools of scorer
+        :param scorer_id:
+            identifier (number) of scorer
         :return:
             None
         """
@@ -157,10 +166,10 @@ class CombinedSamplerFromPool:
 
     def update_tools(
             self,
-            scorer_id: int,
             X_train: np.ndarray,
             y_train: np.ndarray,
             est: Optional[Union[BaseEstimator, BaseMixture]] = None,
+            scorer_id: Optional[int] = None,
             *args, **kwargs
             ) -> type(None):
         """
@@ -169,8 +178,6 @@ class CombinedSamplerFromPool:
         these tools with a new ones based on the passed instance
         of `est`.
 
-        :param scorer_id:
-            number of scorer
         :param X_train:
             feature representation of training objects
         :param y_train:
@@ -180,9 +187,17 @@ class CombinedSamplerFromPool:
             are based on it (e.g., if the i-th scorer is instance of
             `CommitteeScorer`, committee of `est` clones fitted to
             different folds becomes its new tools)
+        :param scorer_id:
+            identifier (number) of scorer; if it is not passed,
+            all scorers are affected
         :return:
             None
         """
-        self.__scorers[scorer_id].update_tools(
-            X_train, y_train, est, *args, **kwargs
-        )
+        if scorer_id is not None:
+            scorer_ids = [scorer_id]
+        else:
+            scorer_ids = range(len(self.__scorers))
+        for position in scorer_ids:
+            self.__scorers[position].update_tools(
+                X_train, y_train, est, *args, **kwargs
+            )
