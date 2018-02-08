@@ -27,7 +27,7 @@ pip install .
 
 Instructions for other operating systems will be released in the future (probably, above commands are valid not only on Linux).
 
-If you have any troubles with installation, your questions are welcome. A virtual environment where it is guaranteed that the package works can be created based on [the file](https://github.com/Nikolay-Lysenko/dsawl/blob/master/package-list.txt) named `package-list.txt` from the repository of the project.
+If you have any troubles with installation, your questions are welcome. A virtual environment where it is guaranteed that the package works can be created based on [the file](https://github.com/Nikolay-Lysenko/dsawl/blob/master/ci/package-list-3.6.txt) named `package-list-3.6.txt` from `ci` directory of this repository.
 
 After successful installation, you can use this package like any other regular package from your currently activated virtual environment. For example, you can import a class from it:
 ```

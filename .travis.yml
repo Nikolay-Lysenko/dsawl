@@ -13,7 +13,8 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - conda create -q -n dsawl_ci --file package-list.txt python=$TRAVIS_PYTHON_VERSION
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.5 ]]; then conda create -q -n dsawl_ci --file ci/package-list-3.5.txt python=$TRAVIS_PYTHON_VERSION; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then conda create -q -n dsawl_ci --file ci/package-list-3.6.txt python=$TRAVIS_PYTHON_VERSION; fi
   - source activate dsawl_ci
   - pip install .
   - pip install codecov
