@@ -24,7 +24,7 @@ setup(
     author_email='nikolay-lysenco@yandex.ru',
     license='MIT',
     keywords='machine_learning feature_engineering categorical_features',
-    packages=find_packages(exclude=['docs', 'tests']),
+    packages=find_packages(exclude=['docs', 'tests', 'ci']),
     python_requires='>=3.5',
     install_requires=['numpy', 'pandas', 'scipy', 'scikit-learn', 'joblib']
 )
