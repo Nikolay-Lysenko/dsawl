@@ -15,12 +15,16 @@ from sklearn.neighbors import (
     KNeighborsClassifier, KNeighborsRegressor, KernelDensity
 )
 
-from dsawl.active_learning.pool_based_sampling import (
+from dsawl.active_learning.scoring_functions import (
     compute_confidences, compute_margins, compute_entropy,
     compute_committee_divergences, compute_committee_variances,
-    compute_estimations_of_variance,
+    compute_estimations_of_variance
+)
+from dsawl.active_learning.scorers import (
     UncertaintyScorerForClassification, CommitteeScorer,
     VarianceScorerForRegression, RandomScorer, DensityScorer,
+)
+from dsawl.active_learning.pool_based_sampling import (
     CombinedSamplerFromPool
 )
 
@@ -643,6 +647,9 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
         predictions = clf.predict(X_new)
         another_predictions = another_clf.predict(X_new)
         self.assertTrue(np.array_equal(predictions, another_predictions))
+        yet_another_clf = sampler.get_tools()[0][0]
+        yet_another_predictions = yet_another_clf.predict(X_new)
+        self.assertTrue(np.array_equal(predictions, yet_another_predictions))
 
     def test_set_tools(self) -> type(None):
         """
@@ -662,7 +669,7 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
         )
         sampler = CombinedSamplerFromPool([scorer])
         another_sampler = CombinedSamplerFromPool([another_scorer])
-        another_sampler.set_tools(0, clf)
+        another_sampler.set_tools(clf, scorer_id=0)
         execution_result = sampler.pick_new_objects(X_new)
         another_execution_result = another_sampler.pick_new_objects(X_new)
         self.assertTrue(execution_result == another_execution_result)
@@ -686,10 +693,13 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
         )
         sampler = CombinedSamplerFromPool([scorer])
         another_sampler = CombinedSamplerFromPool([another_scorer])
-        another_sampler.update_tools(0, X_train, y_train)
+        another_sampler.update_tools(X_train, y_train, scorer_id=0)
         execution_result = sampler.pick_new_objects(X_new)
         another_execution_result = another_sampler.pick_new_objects(X_new)
         self.assertTrue(execution_result == another_execution_result)
+        another_sampler.update_tools(X_train, y_train)
+        yet_another_execution_result = another_sampler.pick_new_objects(X_new)
+        self.assertTrue(execution_result == yet_another_execution_result)
 
 
 def main():
