@@ -15,12 +15,16 @@ from sklearn.neighbors import (
     KNeighborsClassifier, KNeighborsRegressor, KernelDensity
 )
 
-from dsawl.active_learning.pool_based_sampling import (
+from dsawl.active_learning.scoring_functions import (
     compute_confidences, compute_margins, compute_entropy,
     compute_committee_divergences, compute_committee_variances,
-    compute_estimations_of_variance,
+    compute_estimations_of_variance
+)
+from dsawl.active_learning.scorers import (
     UncertaintyScorerForClassification, CommitteeScorer,
     VarianceScorerForRegression, RandomScorer, DensityScorer,
+)
+from dsawl.active_learning.pool_based_sampling import (
     CombinedSamplerFromPool
 )
 
