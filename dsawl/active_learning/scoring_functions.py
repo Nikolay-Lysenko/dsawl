@@ -1,4 +1,8 @@
 """
+The module contains functions that turns output of an estimator or
+an ensemble of estimators into scores that tell how important
+labels of unlabelled objects are.
+
 @author: Nikolay Lysenko
 """
 
@@ -123,9 +127,8 @@ def compute_estimations_of_variance(
         predictions: np.ndarray, predictions_of_square: np.ndarray
         ) -> np.ndarray:
     """
-    Estimate variance of target variable assuming that one regressor
-    predicts mean of the target and another regressor predicts mean of
-    the squared target.
+    Estimate variance of target variable having predicted means of
+    the target and predicted means of the squared target.
 
     :param predictions:
         estimations of mean of target at new objects,

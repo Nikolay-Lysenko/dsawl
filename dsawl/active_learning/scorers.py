@@ -1,4 +1,20 @@
 """
+This module contains classes that can score unlabelled objects
+by usefulness of their labels for a model.
+These classes have public interface in common, but rely on
+different scoring functions and scoring tools internally.
+
+A notion of so called tools is of particular importance. In context
+of this module, the word 'tools' stands for something that is made
+of machine learning models and can return arguments of a scoring
+function. In the most simple case, tools are just a regular estimator:
+e.g., a classifier which can return predicted probabilities or
+a density estimator which can return estimated density at an object.
+However, if a scoring function requires list of predictions made by
+different estimators, tools are a committee (a list) of estimators
+fitted on different folds. Also tools can be a pair of regressors
+fitted to different powers of target.
+
 @author: Nikolay Lysenko
 """
 
@@ -70,9 +86,9 @@ class UncertaintyScorerForClassification(BaseScorer):
     """
     A scorer working with functions that measure uncertainty in
     predicted class probabilities. Examples of such functions:
-    * `compute_confidences`,
-    * `compute_margins`,
-    * `compute_entropy`.
+    * `.scoring_functions.compute_confidences`,
+    * `.scoring_functions.compute_margins`,
+    * `.scoring_functions.compute_entropy`.
 
     :param scoring_fn:
         function for scoring objects
@@ -194,8 +210,8 @@ class CommitteeScorer(BaseScorer):
     """
     A scorer working with functions that measure degree of disagreement
     in predictions of committee members. Examples of such functions:
-    * `compute_committee_divergences`,
-    * `compute_committee_variances`.
+    * `.scoring_functions.compute_committee_divergences`,
+    * `.scoring_functions.compute_committee_variances`.
 
     :param scoring_fn:
         function for scoring objects
@@ -203,7 +219,8 @@ class CommitteeScorer(BaseScorer):
         `False` if the most important object has the highest score
         and `True` else
     :param is_classification:
-        `True` if it is classification or `False` if it is regression
+        `True` if it is a classification problem or `False` if it is
+        a regression problem
     :param committee:
         list of instances of the same class fitted to different folds,
         instances must have `predict_proba` method if it is
@@ -237,12 +254,12 @@ class CommitteeScorer(BaseScorer):
             est: Optional[BaseEstimator] = None
             ) -> type(None):
         # Check that estimator to be cloned for committee has proper methods.
-        if est is None:
+        if est is not None:
+            est_to_be_cloned = est
+        else:
             est_to_be_cloned = (
                 self.__committee[0] if len(self.__committee) > 0 else None
             )
-        else:
-            est_to_be_cloned = est
         if est_to_be_cloned is None:
             raise RuntimeError("Committee has zero length.")
         if not hasattr(est_to_be_cloned, 'fit'):
@@ -344,7 +361,7 @@ class VarianceScorerForRegression(BaseScorer):
     """
     A scorer working with functions that measure estimated variance.
     Examples of such functions:
-    * `compute_estimations_of_variance`.
+    * `.scoring_functions.compute_estimations_of_variance`.
 
     :param scoring_fn:
         function for scoring objects
@@ -380,7 +397,9 @@ class VarianceScorerForRegression(BaseScorer):
             rgr: Optional[BaseEstimator] = None
             ) -> type(None):
         # Check that estimator to be cloned for committee has proper methods.
-        if rgr is None:
+        if rgr is not None:
+            rgr_to_be_cloned = rgr
+        else:
             first_member = self.__rgrs.get('target', None)
             if first_member is None:
                 raise ValueError("Key 'target' is missed.")
@@ -388,8 +407,6 @@ class VarianceScorerForRegression(BaseScorer):
             if second_member is None:
                 raise ValueError("Key 'target^2' is missed.")
             rgr_to_be_cloned = first_member
-        else:
-            rgr_to_be_cloned = rgr
         if not hasattr(rgr_to_be_cloned, 'fit'):
             raise ValueError("Regressor must have `fit` method.")
 
@@ -542,7 +559,7 @@ class DensityScorer(BaseScorer):
     A scorer that ranks objects by density estimations. The higher
     density is, the lower object is ranked.
     This scorer is needed for making exploratory actions, because
-    it selects objects that looks like outliers.
+    it prefers objects that looks like outliers.
 
     :param est:
         density estimator that has methods `fit` and `score_samples`,
