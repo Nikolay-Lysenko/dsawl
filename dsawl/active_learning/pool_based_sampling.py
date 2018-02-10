@@ -56,6 +56,7 @@ class CombinedSamplerFromPool:
         self.__scorers_probabilities = None
         scorers_probabilities = scorers_probabilities or [1 for _ in scorers]
         self.set_scorers_probabilities(scorers_probabilities)
+        self.__last_scorer_id = None
 
     def __set_scorers(
             self, scorers: List[Union[str, BaseScorer]]
@@ -107,28 +108,6 @@ class CombinedSamplerFromPool:
             x / sum(scorers_probabilities) for x in scorers_probabilities
         ]
         self.__scorers_probabilities = scorers_probabilities
-
-    def pick_new_objects(
-            self,
-            X_new: np.ndarray,
-            n_to_pick: int = 1
-            ) -> List[int]:
-        """
-        Select objects from a fixed pool of objects.
-
-        :param X_new:
-            feature representation of new objects
-        :param n_to_pick:
-            number of objects to pick
-        :return:
-            indices of the most important objects
-        """
-        scorer = np.random.choice(
-            self.__scorers, p=self.__scorers_probabilities
-        )
-        scores = scorer.score(X_new)
-        picked_indices = scores.argsort()[-n_to_pick:].tolist()
-        return picked_indices
 
     def get_tools(
             self,
@@ -201,3 +180,36 @@ class CombinedSamplerFromPool:
             self.__scorers[position].update_tools(
                 X_train, y_train, est, *args, **kwargs
             )
+
+    def pick_new_objects(
+            self,
+            X_new: np.ndarray,
+            n_to_pick: int = 1
+            ) -> List[int]:
+        """
+        Select objects from a fixed pool of objects.
+
+        :param X_new:
+            feature representation of new objects
+        :param n_to_pick:
+            number of objects to pick
+        :return:
+            indices of the most important objects
+        """
+        self.__last_scorer_id = np.random.choice(
+            len(self.__scorers), p=self.__scorers_probabilities
+        )
+        scores = self.__scorers[self.__last_scorer_id].score(X_new)
+        picked_indices = scores.argsort()[-n_to_pick:].tolist()
+        return picked_indices
+
+    def get_last_scorer_id(self) -> Optional[int]:
+        """
+        Return identifier (number) of the scorer used for picking new
+        objects last time.
+
+        :return:
+            identifier (number) of the scorer; `None` if the sampler
+            has not been used for picking new objects yet.
+        """
+        return self.__last_scorer_id
