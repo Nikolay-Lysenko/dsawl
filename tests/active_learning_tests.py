@@ -701,6 +701,21 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
         yet_another_execution_result = another_sampler.pick_new_objects(X_new)
         self.assertTrue(execution_result == yet_another_execution_result)
 
+    def test_get_last_scorer_id(self) -> type(None):
+        """
+        Test that `get_last_scorer_id` method works correctly.
+
+        :return:
+            None
+        """
+        sampler = CombinedSamplerFromPool(['margin'])
+        X_train, y_train, X_new = get_dataset_and_pool()
+        sampler.update_tools(X_train, y_train, KNeighborsClassifier())
+        _ = sampler.pick_new_objects(X_new)
+        execution_result = sampler.get_last_scorer_id()
+        true_answer = 0
+        self.assertTrue(execution_result == true_answer)
+
 
 def main():
     test_loader = unittest.TestLoader()
