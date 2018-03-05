@@ -15,9 +15,9 @@ branches:
   - develop
 
 script:
-  - COVERAGE_FILE=.coverage_al coverage run tests/active_learning_tests.py
-  - COVERAGE_FILE=.coverage_s coverage run tests/stacking_tests.py
-  - COVERAGE_FILE=.coverage_te coverage run tests/target_encoding_tests.py
+  - COVERAGE_FILE=.coverage_al coverage run tests/test_active_learning.py
+  - COVERAGE_FILE=.coverage_s coverage run tests/test_stacking.py
+  - COVERAGE_FILE=.coverage_te coverage run tests/test_target_encoding.py
   - coverage combine .coverage_al .coverage_s .coverage_te
 
 after_success:
