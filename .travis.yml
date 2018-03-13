@@ -6,7 +6,7 @@ python:
 
 install:
   - pip install .
-  - pip install codecov
+  - pip install pytest codecov pytest-cov
   - export PYTHONPATH="."  # No data is collected by `coverage` without this.
 
 branches:
@@ -15,10 +15,7 @@ branches:
   - develop
 
 script:
-  - COVERAGE_FILE=.coverage_al coverage run tests/active_learning_tests.py
-  - COVERAGE_FILE=.coverage_s coverage run tests/stacking_tests.py
-  - COVERAGE_FILE=.coverage_te coverage run tests/target_encoding_tests.py
-  - coverage combine .coverage_al .coverage_s .coverage_te
+  - python -m pytest --cov=dsawl --cov-config .coveragerc
 
 after_success:
   - codecov
