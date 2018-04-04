@@ -487,8 +487,8 @@ class BaseStacking(BaseEstimator, ABC):
         sample.
         This is needed for correct measuring of train error -
         composition of calls to `fit` and `predict` does not produce
-        the same results, because features for second stage estimators
-        are produced on the whole learning sample there, whereas they
+        the same results, because features for second stage estimator
+        are produced on the full learning sample there, whereas they
         are produced out-of-fold here.
 
         :param X:
@@ -745,7 +745,7 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
         This is needed for correct measuring of train performance -
         composition of calls to `fit` and `predict_proba` does not
         produce the same results, because features for second stage
-        estimators are produced on the whole learning sample there,
+        estimator are produced on the full learning sample there,
         whereas they are produced out-of-fold here.
 
         :param X:
