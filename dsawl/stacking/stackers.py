@@ -135,11 +135,6 @@ class BaseStacking(BaseEstimator, ABC):
 
         return pairs
 
-    @abstractmethod
-    def _create_base_estimators(self) -> List[BaseEstimator]:
-        # Instantiate base estimators from initialization parameters.
-        pass
-
     def _create_base_estimators_from_their_types(
             self,
             types: List[type]
@@ -163,6 +158,11 @@ class BaseStacking(BaseEstimator, ABC):
         ]
         return base_estimators
 
+    @abstractmethod
+    def _create_base_estimators(self) -> List[BaseEstimator]:
+        # Instantiate base estimators from initialization parameters.
+        pass
+
     def __prepare_all_for_base_estimators_fitting(
             self,
             base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None
@@ -173,11 +173,6 @@ class BaseStacking(BaseEstimator, ABC):
             base_fit_kwargs or {type(x): dict() for x in base_estimators}
         )
         return base_estimators, base_fit_kwargs
-
-    @abstractmethod
-    def _create_meta_estimator(self) -> BaseEstimator:
-        # Instantiate second stage estimator from initialization parameters.
-        pass
 
     def _create_meta_estimator_from_its_type(
             self,
@@ -200,6 +195,11 @@ class BaseStacking(BaseEstimator, ABC):
             meta_estimator_type().set_params(**meta_estimator_params)
         )
         return meta_estimator
+
+    @abstractmethod
+    def _create_meta_estimator(self) -> BaseEstimator:
+        # Instantiate second stage estimator from initialization parameters.
+        pass
 
     def __create_splitter(self) -> FoldType:
         # Create splitter that is used for the first stage of stacking.
