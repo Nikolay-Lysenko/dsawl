@@ -1,11 +1,12 @@
 [![Build Status](https://travis-ci.org/Nikolay-Lysenko/dsawl.svg?branch=master)](https://travis-ci.org/Nikolay-Lysenko/dsawl)
 [![codecov](https://codecov.io/gh/Nikolay-Lysenko/dsawl/branch/master/graph/badge.svg)](https://codecov.io/gh/Nikolay-Lysenko/dsawl)
 [![Maintainability](https://api.codeclimate.com/v1/badges/98fc23b8b51fb20f2920/maintainability)](https://codeclimate.com/github/Nikolay-Lysenko/dsawl/maintainability)
+[![PyPI version](https://badge.fury.io/py/dsawl.svg)](https://badge.fury.io/py/dsawl)
 
 # dsawl
 
 ## What is it?
-This is a set of tools for machine learning. As of now, the provided utilities look as follows:
+This is a set of tools for machine learning. Provided by the package utilities are described in the below table:
 
 Subject | Description | Docs
 :-----: | :---------: | :--:
