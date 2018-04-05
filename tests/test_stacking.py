@@ -22,9 +22,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 
-from dsawl.stacking.stackers import (
-    BaseStacking, StackingRegressor, StackingClassifier
-)
+from dsawl.stacking import BaseStacking, StackingRegressor, StackingClassifier
 
 
 class TestBaseStacking(unittest.TestCase):

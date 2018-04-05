@@ -17,8 +17,8 @@ from sklearn.model_selection import KFold, TimeSeriesSplit
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.utils.estimator_checks import check_estimator
 
-from dsawl.target_encoding.target_encoder import TargetEncoder
-from dsawl.target_encoding.estimators import (
+from dsawl.target_encoding import (
+    TargetEncoder,
     OutOfFoldTargetEncodingRegressor, OutOfFoldTargetEncodingClassifier
 )
 

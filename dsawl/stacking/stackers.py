@@ -135,11 +135,6 @@ class BaseStacking(BaseEstimator, ABC):
 
         return pairs
 
-    @abstractmethod
-    def _create_base_estimators(self) -> List[BaseEstimator]:
-        # Instantiate base estimators from initialization parameters.
-        pass
-
     def _create_base_estimators_from_their_types(
             self,
             types: List[type]
@@ -163,6 +158,11 @@ class BaseStacking(BaseEstimator, ABC):
         ]
         return base_estimators
 
+    @abstractmethod
+    def _create_base_estimators(self) -> List[BaseEstimator]:
+        # Instantiate base estimators from initialization parameters.
+        pass
+
     def __prepare_all_for_base_estimators_fitting(
             self,
             base_fit_kwargs: Optional[Dict[type, Dict[str, Any]]] = None
@@ -173,11 +173,6 @@ class BaseStacking(BaseEstimator, ABC):
             base_fit_kwargs or {type(x): dict() for x in base_estimators}
         )
         return base_estimators, base_fit_kwargs
-
-    @abstractmethod
-    def _create_meta_estimator(self) -> BaseEstimator:
-        # Instantiate second stage estimator from initialization parameters.
-        pass
 
     def _create_meta_estimator_from_its_type(
             self,
@@ -200,6 +195,11 @@ class BaseStacking(BaseEstimator, ABC):
             meta_estimator_type().set_params(**meta_estimator_params)
         )
         return meta_estimator
+
+    @abstractmethod
+    def _create_meta_estimator(self) -> BaseEstimator:
+        # Instantiate second stage estimator from initialization parameters.
+        pass
 
     def __create_splitter(self) -> FoldType:
         # Create splitter that is used for the first stage of stacking.
@@ -487,8 +487,8 @@ class BaseStacking(BaseEstimator, ABC):
         sample.
         This is needed for correct measuring of train error -
         composition of calls to `fit` and `predict` does not produce
-        the same results, because features for second stage estimators
-        are produced on the whole learning sample there, whereas they
+        the same results, because features for second stage estimator
+        are produced on the full learning sample there, whereas they
         are produced out-of-fold here.
 
         :param X:
@@ -745,7 +745,7 @@ class StackingClassifier(BaseStacking, ClassifierMixin):
         This is needed for correct measuring of train performance -
         composition of calls to `fit` and `predict_proba` does not
         produce the same results, because features for second stage
-        estimators are produced on the whole learning sample there,
+        estimator are produced on the full learning sample there,
         whereas they are produced out-of-fold here.
 
         :param X:
