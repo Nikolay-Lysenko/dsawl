@@ -6,6 +6,7 @@
 # dsawl
 
 ## What is it?
+
 This is a set of tools for machine learning. Provided by the package utilities are described in the below table:
 
 Subject | Description | Docs
@@ -18,6 +19,7 @@ Repository name is a combination of three words: DS, saw, and awl. DS is as an a
 
 
 ## How to install the package?
+
 The package is compatible with Python 3.5 or newer. A virtual environment where it is guaranteed that the package works can be created based on [the file](https://github.com/Nikolay-Lysenko/dsawl/blob/master/requirements.txt) named `requirements.txt`.
 
 To install a stable release of the package, run this command:
