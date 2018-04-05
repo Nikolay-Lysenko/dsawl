@@ -17,17 +17,19 @@ Repository name is a combination of three words: DS, saw, and awl. DS is as an a
 
 
 ## How to install the package?
-The package is compatible with Python 3.5 or newer. Other requirements are installed by `pip` if you follow below instructions.
+The package is compatible with Python 3.5 or newer. A virtual environment where it is guaranteed that the package works can be created based on [the file](https://github.com/Nikolay-Lysenko/dsawl/blob/master/requirements.txt) named `requirements.txt`.
 
-If you are using Linux, execute this from your terminal:
+To install a stable release of the package, run this command:
+```
+pip install dsawl
+```
+
+To install the latest version from sources, execute this from your terminal:
 ```
 cd path/to/your/destination
 git clone https://github.com/Nikolay-Lysenko/dsawl
 cd dsawl
-source activate your_virtual_env
-pip install .
+pip install -e .
 ```
 
-Instructions for other operating systems will be released in the future (probably, above commands are valid not only on Linux).
-
-If you have any troubles with installation, your questions are welcome. A virtual environment where it is guaranteed that the package works can be created based on [the file](https://github.com/Nikolay-Lysenko/dsawl/blob/master/requirements.txt) named `requirements.txt`.
+If you have any troubles with installation, your questions are welcome. 
