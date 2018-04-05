@@ -16,7 +16,7 @@ with open(os.path.join(current_dir, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='dsawl',
-    version='0.0.1',
+    version='0.1',
     description='A set of tools for machine learning',
     long_description=long_description,
     url='https://github.com/Nikolay-Lysenko/dsawl',
