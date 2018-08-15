@@ -287,7 +287,7 @@ class OutOfFoldTargetEncodingClassifier(StackingClassifier):
                 'If more than two class labels are not ordered and equally '
                 'spaced, results of their encoding can be poor. Please '
                 'consider encoding binary indicators of classes.',
-                RuntimeWarning
+                UserWarning
             )
         return _fit(self, X, y, source_positions, fit_kwargs)
 
