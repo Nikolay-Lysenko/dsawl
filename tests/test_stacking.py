@@ -121,20 +121,16 @@ class TestStackingRegressor(unittest.TestCase):
              [32.16923077, 23.0],
              [11.94542125, 8.0]]
         )
-        self.assertTrue(np.allclose(rgr.meta_X_, true_meta_X_))
+        np.testing.assert_allclose(rgr.meta_X_, true_meta_X_)
         true_coefs_of_base_lr = np.array([1.05304994, 2.97421767])
-        self.assertTrue(
-            np.allclose(
-                rgr.base_estimators_[0].coef_,
-                true_coefs_of_base_lr
-            )
+        np.testing.assert_allclose(
+            rgr.base_estimators_[0].coef_,
+            true_coefs_of_base_lr
         )
         true_coefs_of_meta_estimator = np.array([1.01168028, -0.04313311])
-        self.assertTrue(
-            np.allclose(
-                rgr.meta_estimator_.coef_,
-                true_coefs_of_meta_estimator
-            )
+        np.testing.assert_allclose(
+            rgr.meta_estimator_.coef_,
+            true_coefs_of_meta_estimator
         )
 
     def test_fit_with_defaults(self) -> type(None):
@@ -210,20 +206,16 @@ class TestStackingRegressor(unittest.TestCase):
              [32.16923077, 23.0],
              [11.94542125, 8.0]]
         )
-        self.assertTrue(np.allclose(rgr.meta_X_, true_meta_X_))
+        np.testing.assert_allclose(rgr.meta_X_, true_meta_X_)
         true_coefs_of_base_lr = np.array([1.05304994, 2.97421767])
-        self.assertTrue(
-            np.allclose(
-                rgr.base_estimators_[0].named_steps.lin_reg.coef_,
-                true_coefs_of_base_lr
-            )
+        np.testing.assert_allclose(
+            rgr.base_estimators_[0].named_steps.lin_reg.coef_,
+            true_coefs_of_base_lr
         )
         true_coefs_of_meta_estimator = np.array([1.01168028, -0.04313311])
-        self.assertTrue(
-            np.allclose(
-                rgr.meta_estimator_.coef_,
-                true_coefs_of_meta_estimator
-            )
+        np.testing.assert_allclose(
+            rgr.meta_estimator_.coef_,
+            true_coefs_of_meta_estimator
         )
 
     def test_fit_with_pipeline_as_meta_estimator(self) -> type(None):
@@ -262,20 +254,16 @@ class TestStackingRegressor(unittest.TestCase):
              [32.16923077, 23.0],
              [11.94542125, 8.0]]
         )
-        self.assertTrue(np.allclose(rgr.meta_X_, true_meta_X_))
+        np.testing.assert_allclose(rgr.meta_X_, true_meta_X_)
         true_coefs_of_base_lr = np.array([1.05304994, 2.97421767])
-        self.assertTrue(
-            np.allclose(
-                rgr.base_estimators_[0].coef_,
-                true_coefs_of_base_lr
-            )
+        np.testing.assert_allclose(
+            rgr.base_estimators_[0].coef_,
+            true_coefs_of_base_lr
         )
         true_coefs_of_meta_estimator = np.array([1.01168028, -0.04313311])
-        self.assertTrue(
-            np.allclose(
-                rgr.meta_estimator_.named_steps.lin_reg.coef_,
-                true_coefs_of_meta_estimator
-            )
+        np.testing.assert_allclose(
+            rgr.meta_estimator_.named_steps.lin_reg.coef_,
+            true_coefs_of_meta_estimator
         )
 
     def test_fit_with_random_state(self) -> type(None):
@@ -299,8 +287,8 @@ class TestStackingRegressor(unittest.TestCase):
         rgr.fit(X, y)
         second_meta_X = copy(rgr.meta_X_)
         second_importances = rgr.base_estimators_[0].feature_importances_
-        self.assertTrue(np.array_equal(first_meta_X, second_meta_X))
-        self.assertTrue(np.array_equal(first_importances, second_importances))
+        np.testing.assert_equal(first_meta_X, second_meta_X)
+        np.testing.assert_equal(first_importances, second_importances)
 
     def test_fit_with_sample_weights(self) -> type(None):
         """
@@ -339,17 +327,16 @@ class TestStackingRegressor(unittest.TestCase):
              [29, 26],
              [8, 11]]
         )
-        self.assertTrue(np.array_equal(rgr.meta_X_, true_meta_X))
+        np.testing.assert_equal(rgr.meta_X_, true_meta_X)
         true_coefs_of_meta_estimator = np.array([0.11326539, 0.90735827])
-        self.assertTrue(
-            np.allclose(
-                rgr.meta_estimator_.coef_,
-                true_coefs_of_meta_estimator
-            )
+        np.testing.assert_allclose(
+            rgr.meta_estimator_.coef_,
+            true_coefs_of_meta_estimator
         )
         true_intercept_of_meta_estimator = 0.755864160903
         self.assertAlmostEqual(
-            rgr.meta_estimator_.intercept_, true_intercept_of_meta_estimator
+            rgr.meta_estimator_.intercept_,
+            true_intercept_of_meta_estimator
         )
 
     def test_fit_without_saving(self) -> type(None):
@@ -398,7 +385,7 @@ class TestStackingRegressor(unittest.TestCase):
         true_answer = np.array(
             [15.73572972, -15.2612211, 33.47352854, 5.11031499]
         )
-        self.assertTrue(np.allclose(result, true_answer))
+        np.testing.assert_allclose(result, true_answer)
 
     def test_drop_training_meta_features(self) -> type(None):
         """
@@ -492,20 +479,16 @@ class TestStackingClassifier(unittest.TestCase):
              [0.99769978, 1.0],
              [0.1056699, 0.0]]
         )
-        self.assertTrue(np.allclose(clf.meta_X_, true_meta_X_))
+        np.testing.assert_allclose(clf.meta_X_, true_meta_X_)
         true_coefs_of_base_lr = np.array([[0.80295565, -1.11280117]])
-        self.assertTrue(
-            np.allclose(
-                clf.base_estimators_[0].coef_,
-                true_coefs_of_base_lr
-            )
+        np.testing.assert_allclose(
+            clf.base_estimators_[0].coef_,
+            true_coefs_of_base_lr
         )
         true_coefs_of_meta_estimator = np.array([[-0.87613043, -1.5124705]])
-        self.assertTrue(
-            np.allclose(
-                clf.meta_estimator_.coef_,
-                true_coefs_of_meta_estimator
-            )
+        np.testing.assert_allclose(
+            clf.meta_estimator_.coef_,
+            true_coefs_of_meta_estimator
         )
 
     def test_fit_with_defaults(self) -> type(None):
@@ -558,7 +541,7 @@ class TestStackingClassifier(unittest.TestCase):
              [1.0, 0.0, 1.0, 0.0],
              [1.0, 0.0, 1.0, 0.0]]
         )
-        self.assertTrue(np.allclose(clf.meta_X_, true_meta_X))
+        np.testing.assert_allclose(clf.meta_X_, true_meta_X)
 
     def test_fit_without_predict_proba(self) -> type(None):
         """
@@ -594,7 +577,7 @@ class TestStackingClassifier(unittest.TestCase):
              [1, 0]],
             dtype=float
         )
-        self.assertTrue(np.array_equal(clf.meta_X_, true_meta_X_))
+        np.testing.assert_equal(clf.meta_X_, true_meta_X_)
 
     def test_predict(self) -> type(None):
         """
@@ -630,7 +613,7 @@ class TestStackingClassifier(unittest.TestCase):
 
         result = clf.predict(X_test)
         true_answer = np.array([0, 1, 0, 1])
-        self.assertTrue(np.allclose(result, true_answer))
+        np.testing.assert_allclose(result, true_answer)
 
     def test_predict_proba(self) -> type(None):
         """
@@ -671,7 +654,7 @@ class TestStackingClassifier(unittest.TestCase):
              [0.58374647, 0.41625353],
              [0.42309387, 0.57690613]]
         )
-        self.assertTrue(np.allclose(result, true_answer))
+        np.testing.assert_allclose(result, true_answer)
 
     def test_fit_predict_proba_with_false_in_keep_meta_X(self) -> type(None):
         """

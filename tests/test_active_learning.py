@@ -59,7 +59,7 @@ class TestScoringFunctions(unittest.TestCase):
         predicted_probabilities = get_predictions()
         execution_result = compute_confidences(predicted_probabilities)
         true_answer = np.array([0.5, 0.9, 0.34, 0.5])
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_compute_margins(self) -> type(None):
         """
@@ -71,7 +71,7 @@ class TestScoringFunctions(unittest.TestCase):
         predicted_probabilities = get_predictions()
         execution_result = compute_margins(predicted_probabilities)
         true_answer = np.array([0.2, 0.8, 0.01, 0.])
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_compute_entropy(self) -> type(None):
         """
@@ -85,7 +85,7 @@ class TestScoringFunctions(unittest.TestCase):
         true_answer = np.array(
             [1.02965301, 0.32508297, 1.09851262, 0.69314718]
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_compute_committee_divergences(self) -> type(None):
         """
@@ -101,7 +101,7 @@ class TestScoringFunctions(unittest.TestCase):
             list_of_predicted_probabilities
         )
         true_answer = np.array([0.0321534, 0.20349845])
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_compute_committee_variances(self) -> type(None):
         """
@@ -115,7 +115,7 @@ class TestScoringFunctions(unittest.TestCase):
         list_of_predictions = [stub[:2, 0], stub[2:, 0]]
         execution_result = compute_committee_variances(list_of_predictions)
         true_answer = np.array([0.004225, 0.04])
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_compute_estimations_of_variance(self) -> type(None):
         """
@@ -131,7 +131,7 @@ class TestScoringFunctions(unittest.TestCase):
             predictions, predictions_of_square
         )
         true_answer = np.array([0.19, 0.26, 0.31])
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
 
 def get_dataset_and_pool() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -206,7 +206,7 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
         )
         execution_result = scorer.score(X_new)
         true_answer = np.array([-0.6, -0.6, -0.4, -0.6, -0.6])
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
 
     def test_score_with_margins(self) -> type(None):
         """
@@ -226,7 +226,7 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
         )
         execution_result = scorer.score(X_new)
         true_answer = np.array([-0.2, -0.2, 0, -0.4, -0.2])
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_score_with_entropy(self) -> type(None):
         """
@@ -247,7 +247,7 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
         true_answer = np.array(
             [0.67301167, 0.67301167, 1.05492017, 0.95027054, 0.67301167]
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_get_tools_and_set_tools(self) -> type(None):
         """
@@ -269,7 +269,7 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
         scorer.set_tools(another_clf)
         predictions = scorer.get_tools().predict(X_new)
         another_predictions = another_clf.predict(X_new)
-        self.assertTrue(np.array_equal(predictions, another_predictions))
+        np.testing.assert_equal(predictions, another_predictions)
 
     def test_update_tools(self) -> type(None):
         """
@@ -287,11 +287,11 @@ class TestUncertaintyScorerForClassification(unittest.TestCase):
         scorer.update_tools(X_train, y_train)
         execution_result = scorer.get_tools().predict(X_new)
         true_answer = np.array([2, 3, 2, 1, 1])
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
         scorer.update_tools(X_train[:-1, :], y_train[:-1], clf)
         execution_result = scorer.get_tools().predict(X_new)
         true_answer = np.array([2, 1, 2, 1, 1])
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
 
 
 class TestCommitteeScorer(unittest.TestCase):
@@ -315,7 +315,7 @@ class TestCommitteeScorer(unittest.TestCase):
         scorer.update_tools(X_train, y_train, KNeighborsClassifier())
         execution_result = scorer.score(X_new)
         true_answer = np.array([0, 0, 0, 0.09080533, 0])
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer, atol=1e-15)
 
     def test_score_with_variances(self) -> type(None):
         """
@@ -334,7 +334,7 @@ class TestCommitteeScorer(unittest.TestCase):
         scorer.update_tools(X_train, y_train, KNeighborsRegressor())
         execution_result = scorer.score(X_new)
         true_answer = np.array([0, 0, 0, 0.008888889, 0])
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_get_tools_and_set_tools(self) -> type(None):
         """
@@ -356,7 +356,7 @@ class TestCommitteeScorer(unittest.TestCase):
         scorer.set_tools([another_clf])
         predictions = scorer.get_tools()[0].predict(X_new)
         another_predictions = another_clf.predict(X_new)
-        self.assertTrue(np.array_equal(predictions, another_predictions))
+        np.testing.assert_equal(predictions, another_predictions)
 
     def test_update_tools(self) -> type(None):
         """
@@ -375,7 +375,7 @@ class TestCommitteeScorer(unittest.TestCase):
         execution_result = [clf.predict(X_new) for clf in scorer.get_tools()]
         true_answer = [np.array([1, 1, 2, 1, 1]) for _ in range(3)]
         for result, answer in zip(execution_result, true_answer):
-            self.assertTrue(np.array_equal(result, answer))
+            np.testing.assert_equal(result, answer)
         scorer.update_tools(
             np.vstack((X_train, X_train[1, :])),
             np.hstack((y_train, y_train[1])),
@@ -384,7 +384,7 @@ class TestCommitteeScorer(unittest.TestCase):
         execution_result = [clf.predict(X_new) for clf in scorer.get_tools()]
         true_answer = [np.array([1, 1, 2, 1, 1]) for _ in range(3)]
         for result, answer in zip(execution_result, true_answer):
-            self.assertTrue(np.array_equal(result, answer))
+            np.testing.assert_equal(result, answer)
 
 
 class TestVarianceScorerForRegression(unittest.TestCase):
@@ -407,7 +407,7 @@ class TestVarianceScorerForRegression(unittest.TestCase):
         scorer.update_tools(X_train, y_train, KNeighborsRegressor())
         execution_result = scorer.score(X_new)
         true_answer = np.array([0.24, 0.96, 0.56, 0.64, 0.24])
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_get_tools_and_set_tools(self) -> type(None):
         """
@@ -435,7 +435,7 @@ class TestVarianceScorerForRegression(unittest.TestCase):
         scorer.set_tools(another_rgrs)
         predictions = scorer.get_tools()['target'].predict(X_new)
         another_predictions = another_rgrs['target'].predict(X_new)
-        self.assertTrue(np.array_equal(predictions, another_predictions))
+        np.testing.assert_equal(predictions, another_predictions)
 
     def test_update_tools(self) -> type(None):
         """
@@ -456,13 +456,13 @@ class TestVarianceScorerForRegression(unittest.TestCase):
         scorer.update_tools(X_train, y_train)
         execution_result = scorer.get_tools()['target'].predict(X_new)
         true_answer = np.array([1.6, 2.2, 2.2, 1.6, 1.4])
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
         scorer.update_tools(
             X_train[:-1, :], y_train[:-1], KNeighborsRegressor()
         )
         execution_result = scorer.get_tools()['target'].predict(X_new)
         true_answer = np.array([1.6, 1.8, 2.4, 1.6, 1.4])
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
 
 
 class TestRandomScorer(unittest.TestCase):
@@ -480,7 +480,7 @@ class TestRandomScorer(unittest.TestCase):
         X_train, y_train, X_new = get_dataset_and_pool()
         scorer = RandomScorer()
         execution_result = scorer.score(X_new)
-        self.assertTrue(len(execution_result) == len(X_new))
+        self.assertEqual(len(execution_result), len(X_new))
 
     def test_get_tools_and_set_tools(self) -> type(None):
         """
@@ -530,7 +530,7 @@ class TestDensityScorer(unittest.TestCase):
         true_answer = np.array(
             [3.12072551, 3.12072551, 3.20416149, 2.86297789, 11.471556]
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_get_tools_and_set_tools(self) -> type(None):
         """
@@ -549,7 +549,7 @@ class TestDensityScorer(unittest.TestCase):
         scorer.set_tools(another_est)
         estimates = scorer.get_tools().score_samples(X_new)
         another_estimates = another_est.score_samples(X_new)
-        self.assertTrue(np.array_equal(estimates, another_estimates))
+        np.testing.assert_equal(estimates, another_estimates)
 
     def test_update_tools(self) -> type(None):
         """
@@ -566,7 +566,7 @@ class TestDensityScorer(unittest.TestCase):
         true_answer = np.array(
             [3.12072551, 3.12072551, 3.20416149, 2.86297789, 11.471556]
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
         scorer.update_tools(
             X_train[:-1, :], y_train[:-1], KernelDensity()
         )
@@ -574,7 +574,7 @@ class TestDensityScorer(unittest.TestCase):
         true_answer = np.array(
             [3.00564647, 3.16244687, 3.26104477, 2.78801309, 11.353773]
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
 
 class TestCombinedSamplerFromPool(unittest.TestCase):
@@ -599,7 +599,9 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
         sampler = CombinedSamplerFromPool([scorer])
         execution_result = sampler.pick_new_objects(X_new)
         true_answer = [2]
-        self.assertTrue(execution_result == true_answer)
+        self.assertEqual(len(execution_result), len(true_answer))
+        zipped = zip(execution_result, true_answer)
+        self.assertTrue(all([first == second for first, second in zipped]))
 
     def test_pick_new_objects_with_two_scorers(self) -> type(None):
         """
@@ -622,10 +624,10 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
             scorers, scorers_probabilities=[0.2, 0.8]
         )
         picked_indices = sampler.pick_new_objects(X_new, n_to_pick=2)
-        self.assertTrue(len(picked_indices) == 2)
+        self.assertEqual(len(picked_indices), 2)
         for index in picked_indices:
             self.assertTrue(0 <= index < len(X_new))
-        self.assertTrue(picked_indices[0] != picked_indices[1])
+        self.assertNotEqual(picked_indices[0], picked_indices[1])
 
     def test_get_tools(self) -> type(None):
         """
@@ -644,10 +646,10 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
         another_clf = sampler.get_tools(0)[0]
         predictions = clf.predict(X_new)
         another_predictions = another_clf.predict(X_new)
-        self.assertTrue(np.array_equal(predictions, another_predictions))
+        np.testing.assert_equal(predictions, another_predictions)
         yet_another_clf = sampler.get_tools()[0][0]
         yet_another_predictions = yet_another_clf.predict(X_new)
-        self.assertTrue(np.array_equal(predictions, yet_another_predictions))
+        np.testing.assert_equal(predictions, yet_another_predictions)
 
     def test_set_tools(self) -> type(None):
         """
@@ -670,7 +672,7 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
         another_sampler.set_tools(clf, scorer_id=0)
         execution_result = sampler.pick_new_objects(X_new)
         another_execution_result = another_sampler.pick_new_objects(X_new)
-        self.assertTrue(execution_result == another_execution_result)
+        self.assertEqual(execution_result, another_execution_result)
 
     def test_update_tools(self) -> type(None):
         """
@@ -694,10 +696,10 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
         another_sampler.update_tools(X_train, y_train, scorer_id=0)
         execution_result = sampler.pick_new_objects(X_new)
         another_execution_result = another_sampler.pick_new_objects(X_new)
-        self.assertTrue(execution_result == another_execution_result)
+        self.assertEqual(execution_result, another_execution_result)
         another_sampler.update_tools(X_train, y_train)
         yet_another_execution_result = another_sampler.pick_new_objects(X_new)
-        self.assertTrue(execution_result == yet_another_execution_result)
+        self.assertEqual(execution_result, yet_another_execution_result)
 
     def test_get_last_scorer_id(self) -> type(None):
         """
@@ -712,7 +714,7 @@ class TestCombinedSamplerFromPool(unittest.TestCase):
         _ = sampler.pick_new_objects(X_new)
         execution_result = sampler.get_last_scorer_id()
         true_answer = 0
-        self.assertTrue(execution_result == true_answer)
+        self.assertEqual(execution_result, true_answer)
 
 
 def main():

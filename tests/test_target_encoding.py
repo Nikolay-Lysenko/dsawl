@@ -99,7 +99,7 @@ class TestTargetEncoder(unittest.TestCase):
              [10, 8, 7]],
             dtype=float
         )
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
 
     def test_fit_transform_with_more_source_positions(self) -> type(None):
         """
@@ -132,7 +132,7 @@ class TestTargetEncoder(unittest.TestCase):
              [12, 12, 8, 7]],
             dtype=float
         )
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
 
     def test_fit_transform_with_keeping_of_sources(self) -> type(None):
         """
@@ -169,7 +169,7 @@ class TestTargetEncoder(unittest.TestCase):
              [10, -1, 8]],
             dtype=float
         )
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
 
     def test_fit_transform_with_smoothing(self) -> type(None):
         """
@@ -205,7 +205,7 @@ class TestTargetEncoder(unittest.TestCase):
              [10, 7, 6]],
             dtype=float
         )
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
 
     def test_fit_transform_with_min_frequency(self) -> type(None):
         """
@@ -242,7 +242,7 @@ class TestTargetEncoder(unittest.TestCase):
              [4, 76 / 14, 5]],
             dtype=float
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_fit_transform_with_negative_source_positions(self) -> type(None):
         """
@@ -276,7 +276,7 @@ class TestTargetEncoder(unittest.TestCase):
              [10, 8, 7]],
             dtype=float
         )
-        self.assertTrue(np.array_equal(execution_result, true_answer))
+        np.testing.assert_equal(execution_result, true_answer)
 
     def test_fit_transform_out_of_fold(self) -> type(None):
         """
@@ -312,7 +312,7 @@ class TestTargetEncoder(unittest.TestCase):
              [10, 5.5, 5.5]],
             dtype=float
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_fit_transform_out_of_fold_with_more_sources(self) -> type(None):
         """
@@ -348,7 +348,7 @@ class TestTargetEncoder(unittest.TestCase):
              [11, 11, 5.5, 5.5]],
             dtype=float
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_fit_transform_out_of_fold_with_loo(self) -> type(None):
         """
@@ -384,7 +384,7 @@ class TestTargetEncoder(unittest.TestCase):
              [10, 6.5, 6.5]],
             dtype=float
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_fit_transform_out_of_fold_with_keeping_of_sources(
             self
@@ -425,7 +425,7 @@ class TestTargetEncoder(unittest.TestCase):
              [10, -1, 5.5, 5.5]],
             dtype=float
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_fit_transform_out_of_fold_on_ordered_data(self) -> type(None):
         """
@@ -457,7 +457,7 @@ class TestTargetEncoder(unittest.TestCase):
              [10, 6, 6]],
             dtype=float
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
     def test_correct_work_with_rare_values(self) -> type(None):
         """
@@ -488,7 +488,7 @@ class TestTargetEncoder(unittest.TestCase):
              [6, 3, 3]],
             dtype=float
         )
-        self.assertTrue(np.allclose(execution_result, true_answer))
+        np.testing.assert_allclose(execution_result, true_answer)
 
 
 def get_dataset_for_regression() -> Tuple[np.ndarray, np.ndarray]:
@@ -542,7 +542,7 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
         rgr.fit(X, y, source_positions=[1])
         learnt_slopes = rgr.meta_estimator_.coef_
         true_answer = np.array([1.8, 0.8])
-        self.assertTrue(np.allclose(learnt_slopes, true_answer))
+        np.testing.assert_allclose(learnt_slopes, true_answer)
 
     def test_predict(self) -> type(None):
         """
@@ -575,7 +575,7 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
 
         result = rgr.predict(X)
         true_answer = np.array([5.8, 2.2, 4, 0.6, 2.4, 4.2])
-        self.assertTrue(np.allclose(result, true_answer))
+        np.testing.assert_allclose(result, true_answer)
 
     def test_fit_predict(self) -> type(None):
         """
@@ -591,7 +591,7 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
         )
         result = rgr.fit_predict(X, y, source_positions=[1])
         true_answer = np.array([5.8, 2.2, 4, 1, 1.6, 3.4])
-        self.assertTrue(np.allclose(result, true_answer))
+        np.testing.assert_allclose(result, true_answer)
 
     def test_fit_predict_with_changed_source_positions(self) -> type(None):
         """
@@ -609,7 +609,7 @@ class TestOutOfFoldTargetEncodingRegressor(unittest.TestCase):
         )
         result = rgr.fit_predict(X, y, source_positions=[0])
         true_answer = np.array([5.8, 2.2, 4, 1, 1.6, 3.4])
-        self.assertTrue(np.allclose(result, true_answer))
+        np.testing.assert_allclose(result, true_answer)
 
 
 def get_dataset_for_classification() -> Tuple[np.ndarray, np.ndarray]:
@@ -669,7 +669,7 @@ class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
         clf.fit(X, y, source_positions=[1])
         learnt_slopes = clf.meta_estimator_.coef_
         true_answer = np.array([[0.48251806, -0.16291334]])
-        self.assertTrue(np.allclose(learnt_slopes, true_answer))
+        np.testing.assert_allclose(learnt_slopes, true_answer)
 
     def test_predict_proba(self) -> type(None):
         """
@@ -705,7 +705,7 @@ class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
         result = clf.predict_proba(X)[:, 1]
         true_answer = np.array([0.69413293, 0.46368326, 0.58346035,
                                 0.47721111, 0.59659543, 0.70553938])
-        self.assertTrue(np.allclose(result, true_answer))
+        np.testing.assert_allclose(result, true_answer)
 
     def test_fit_predict_proba(self) -> type(None):
         """
@@ -723,7 +723,7 @@ class TestOutOfFoldTargetEncodingClassifier(unittest.TestCase):
         result = clf.fit_predict_proba(X, y, source_positions=[1])[:, 1]
         true_answer = np.array([0.68248347, 0.45020866, 0.59004395,
                                 0.47044176, 0.60959347, 0.71669408])
-        self.assertTrue(np.allclose(result, true_answer))
+        np.testing.assert_allclose(result, true_answer)
 
 
 def main():
