@@ -5,6 +5,7 @@ python:
   - "3.6"
 
 install:
+  - pip install -r requirements.txt
   - pip install .
   - pip install pytest codecov pytest-cov
   - export PYTHONPATH="."  # No data is collected by `coverage` without this.
